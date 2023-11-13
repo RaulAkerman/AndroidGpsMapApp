@@ -12,6 +12,7 @@ import android.graphics.Color
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.PersistableBundle
 import android.util.Log
 import android.view.View
 import android.widget.Button
@@ -23,7 +24,6 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.Polyline
 import com.google.android.gms.maps.model.PolylineOptions
 
@@ -43,8 +43,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private val polyLineOptions = PolylineOptions().width(10f).color(Color.RED)
     private var polyline : Polyline? = null
+    private var isMapReady = false
+    //Create view model
+    private val polylineViewModel: PolylineViewModel by lazy {
+        PolylineViewModel()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
@@ -52,21 +58,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         textViewMainLat = findViewById(R.id.textViewMainLat)
         textViewMainLon= findViewById(R.id.textViewMainLon)
 
-
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
-
 
         innerBroadcastReceiverIntentFilter.addAction(C.ACTION_LOCATION_UPDATE)
 
         checkLocationPermissions()
 
         createNotificationChannel()
+
     }
 
     private fun createNotificationChannel() {
-        Log.d(TAG, "createNotificationChannel")
+        //Log.d(TAG, "createNotificationChannel")
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -107,11 +112,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             //                                          int[] grantResults)
             // to handle the case where the user grants the permission. See the documentation
             // for ActivityCompat#requestPermissions for more details.
-            Log.d(TAG, "NO LOCATION ACCESS, NO NOTIFICATIONS ")
+            //Log.d(TAG, "NO LOCATION ACCESS, NO NOTIFICATIONS ")
             requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.POST_NOTIFICATIONS), C.REQUEST_PERMISSIONS_CODE)
         }
     }
-
 
     override fun onResume() {
         super.onResume()
@@ -122,6 +126,26 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onPause() {
         super.onPause()
         LocalBroadcastManager.getInstance(this).unregisterReceiver(innerBroadcastReceiver)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        //Save polyline to view model
+        polylineViewModel.polylinePoints = polyLineOptions.points
+        outState.putSerializable(C.SAVED_POLYLINE_POINTS, polylineViewModel.polylinePoints as ArrayList<LatLng>)
+    }
+
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        //Restore polyline from view model
+        polylineViewModel.polylinePoints = savedInstanceState.getSerializable(C.SAVED_POLYLINE_POINTS) as ArrayList<LatLng>
+    }
+
+    fun restorePolyLine(){
+        polylineViewModel.polylinePoints?.let {
+            polyLineOptions.addAll(it)
+            polyline = mMap.addPolyline(polyLineOptions)
+        }
     }
 
     fun buttonMainStartStopServiceOnClick(view: View) {
@@ -141,21 +165,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     override fun onMapReady(googleMap: GoogleMap) {
-        Log.d(TAG, "onMapReady")
         mMap = googleMap
+        isMapReady = true
+        // Restore polyline from saved instance state
+        restorePolyLine()
 
         // Add a marker in Sydney and move the camera
         val latLng = LatLng(59.0, 24.0)
-        // mMap.addMarker(MarkerOptions().position(latLng).title("Marker in Sydney"))
         mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng))
         mMap.animateCamera(CameraUpdateFactory.zoomTo(15f))
     }
 
 
     private fun updateLocation(lat: Double, lon: Double){
-        if (polyline != null) {
-            polyline!!.remove()
-        }
+        polyline?.remove()
 
         val latLng = LatLng(lat, lon)
 
