@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.location.Location
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -23,11 +24,14 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.Marker
+import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.Polyline
 import com.google.android.gms.maps.model.PolylineOptions
 
-class MainActivity : AppCompatActivity(), OnMapReadyCallback {
+class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapClickListener {
     companion object {
         private val TAG = this::class.java.declaringClass!!.simpleName
     }
@@ -41,9 +45,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private val innerBroadcastReceiver = InnerBroadcastReceiver()
     private val innerBroadcastReceiverIntentFilter = IntentFilter()
 
+    private var currentWaypoint: Marker? = null
+    private val checkpoints = mutableListOf<Marker>()
+
     private val polyLineOptions = PolylineOptions().width(10f).color(Color.RED)
     private var polyline : Polyline? = null
+    private var markerPolyLine: Polyline? = null
     private var isMapReady = false
+
     //Create view model
     private val polylineViewModel: PolylineViewModel by lazy {
         PolylineViewModel()
@@ -117,6 +126,55 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
+    fun addCheckpoint(checkpointLatLng: LatLng) {
+        val checkpointMarker = mMap.addMarker(
+            MarkerOptions()
+                .title("Checkpoint")
+                .position(checkpointLatLng)
+                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
+        )
+        if (checkpointMarker != null) {
+            //add checkpoint to checkpoints at the end
+            checkpoints.add(checkpointMarker)
+        }
+    }
+
+    fun addWaypoint(waypointLatLng: LatLng) {
+        currentWaypoint?.remove()
+        //add waypoint as Location
+        currentWaypoint = mMap.addMarker(
+            MarkerOptions()
+                .title("Waypoint")
+                .position(waypointLatLng)
+                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE))
+        )
+    }
+
+    fun drawPath() {
+        markerPolyLine?.remove()
+
+        val markerPolyLineOptions = PolylineOptions()
+            .clickable(true)
+            .color(Color.MAGENTA)
+            .width(10f)
+
+        // Draw line between waypoint and first checkpoint
+        currentWaypoint?.let { waypoint ->
+            if (checkpoints.isNotEmpty()) {
+                markerPolyLineOptions.add(waypoint.position)
+                markerPolyLineOptions.add(checkpoints[0].position)
+            }
+        }
+
+        // Draw lines between checkpoints
+        for (i in 0 until checkpoints.size - 1) {
+            markerPolyLineOptions.add(checkpoints[i].position)
+            markerPolyLineOptions.add(checkpoints[i + 1].position)
+        }
+
+        markerPolyLine = mMap.addPolyline(markerPolyLineOptions)
+    }
+    
     override fun onResume() {
         super.onResume()
 
@@ -128,11 +186,19 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         LocalBroadcastManager.getInstance(this).unregisterReceiver(innerBroadcastReceiver)
     }
 
+    override fun onMapClick(p0: LatLng) {
+        Log.d(TAG, "onMapClick")
+        addWaypoint(p0)
+        drawPath()
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         //Save polyline to view model
         polylineViewModel.polylinePoints = polyLineOptions.points
         outState.putSerializable(C.SAVED_POLYLINE_POINTS, polylineViewModel.polylinePoints as ArrayList<LatLng>)
+        //Save markers to view model
+
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
@@ -167,6 +233,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
         isMapReady = true
+        //Set on click listener for map
+        mMap.setOnMapClickListener { latLng ->
+            addWaypoint(latLng)
+            drawPath()
+        }
+        //Set on long click listener for map
+        mMap.setOnMapLongClickListener { latLng ->
+            addCheckpoint(latLng)
+            drawPath()
+        }
+
         // Restore polyline from saved instance state
         restorePolyLine()
 
@@ -202,4 +279,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     }
 
+    private fun calculateDistance(start: LatLng, end: LatLng): Float {
+        val results = FloatArray(1)
+        Location.distanceBetween(start.latitude, start.longitude, end.latitude, end.longitude, results)
+        return results[0]
+    }
 }
