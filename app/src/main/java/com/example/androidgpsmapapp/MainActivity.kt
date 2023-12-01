@@ -37,6 +37,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         private val TAG = this::class.java.declaringClass!!.simpleName
     }
 
+    lateinit var buttonMainAddCheckpoint: Button
+
     private var locationServiceRunning = false
     private lateinit var buttonMainStartStopService: Button
     private lateinit var textViewMainLat: TextView
@@ -49,6 +51,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
     private var currentWaypoint: Marker? = null
     private val checkpoints = mutableListOf<Marker>()
+    private var userLocation: LatLng? = null
 
     private val polyLineOptions = PolylineOptions().width(10f).color(Color.RED)
     private var polyline : Polyline? = null
@@ -94,6 +97,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         checkLocationPermissions()
 
         createNotificationChannel()
+
+        buttonMainAddCheckpoint = findViewById(R.id.buttonMainAddCheckpoint)
+
+        //Set on click listener for add checkpoint button
+        buttonMainAddCheckpoint.setOnClickListener {
+            if (userLocation != null) {
+                addCheckpoint(userLocation!!)
+            }
+        }
 
     }
 
@@ -165,6 +177,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 .position(waypointLatLng)
                 .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE))
         )
+        drawPath()
     }
 
     fun drawPath() {
@@ -175,19 +188,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             .color(Color.MAGENTA)
             .width(10f)
 
-        // Draw line between waypoint and first checkpoint
-        currentWaypoint?.let { waypoint ->
-            if (checkpoints.isNotEmpty()) {
-                markerPolyLineOptions.add(waypoint.position)
-                markerPolyLineOptions.add(checkpoints[0].position)
+        // Draw line between waypoint and user location
+        if (currentWaypoint != null) {
+            markerPolyLineOptions.add(currentWaypoint!!.position)
+            if (userLocation == null) {
+                // Initialize userLocation if it's null
+                userLocation = LatLng(0.0, 0.0) // replace with actual user location
             }
+            markerPolyLineOptions.add(userLocation)
         }
 
-        // Draw lines between checkpoints
-        for (i in 0 until checkpoints.size - 1) {
-            markerPolyLineOptions.add(checkpoints[i].position)
-            markerPolyLineOptions.add(checkpoints[i + 1].position)
-        }
 
         markerPolyLine = mMap.addPolyline(markerPolyLineOptions)
     }
@@ -214,17 +224,28 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         polylineViewModel.polylinePoints = polyLineOptions.points
         outState.putSerializable(C.SAVED_POLYLINE_POINTS, polylineViewModel.polylinePoints as ArrayList<LatLng>)
         //Save markers to view model
-        Log.d(TAG, "CHECKPOINTS: $checkpoints")
         polylineViewModel.checkpoints = checkpoints
         outState.putSerializable(C.SAVED_CHECKPOINTS, polylineViewModel.checkpoints as ArrayList<Marker>)
+        //Save waypoints to view model
+        if (currentWaypoint != null) {
+            polylineViewModel.waypoints = mutableListOf(currentWaypoint!!)
+            outState.putSerializable(C.SAVED_WAYPOINTS, polylineViewModel.waypoints as ArrayList<Marker>)
+        }
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         super.onRestoreInstanceState(savedInstanceState)
         //Restore polyline from view model
-        polylineViewModel.polylinePoints = savedInstanceState.getSerializable(C.SAVED_POLYLINE_POINTS) as ArrayList<LatLng>
+        polylineViewModel.polylinePoints =
+            savedInstanceState.getSerializable(C.SAVED_POLYLINE_POINTS) as ArrayList<LatLng>
         //Restore markers from view model
-        polylineViewModel.checkpoints = savedInstanceState.getSerializable(C.SAVED_CHECKPOINTS) as ArrayList<Marker>
+        polylineViewModel.checkpoints =
+            savedInstanceState.getSerializable(C.SAVED_CHECKPOINTS) as ArrayList<Marker>
+        //Restore waypoints from view model
+        if (savedInstanceState.getSerializable(C.SAVED_WAYPOINTS) != null) {
+            polylineViewModel.waypoints =
+                savedInstanceState.getSerializable(C.SAVED_WAYPOINTS) as ArrayList<Marker>
+        }
     }
 
     fun restorePolyLine(){
@@ -235,12 +256,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     fun restoreMarkers(){
-        if (polylineViewModel.checkpoints == null) return
-        for (checkpoint in polylineViewModel.checkpoints!!){
-            addCheckpoint(checkpoint.position)
+        if (polylineViewModel.checkpoints != null) {
+            for (checkpoint in polylineViewModel.checkpoints!!) {
+                addCheckpoint(checkpoint.position)
+            }
         }
-        // Draw path
-        drawPath()
+        if (polylineViewModel.waypoints != null) {
+            for (waypoint in polylineViewModel.waypoints!!) {
+                addWaypoint(waypoint.position)
+            }
+        }
     }
 
     fun buttonMainStartStopServiceOnClick(view: View) {
@@ -285,7 +310,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         mMap.animateCamera(CameraUpdateFactory.zoomTo(15f))
     }
 
-
     private fun updateLocation(lat: Double, lon: Double){
         polyline?.remove()
 
@@ -302,6 +326,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         override fun onReceive(context: Context?, broadcastIntent: Intent?) {
             when (broadcastIntent!!.action){
                 C.ACTION_LOCATION_UPDATE -> {
+                    userLocation = LatLng(
+                        broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0),
+                        broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0)
+                    )
+                    drawPath()
                     textViewMainLat.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0).toString()
                     textViewMainLon.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0).toString()
                     updateLocation(broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0), broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0))
