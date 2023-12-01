@@ -5,7 +5,6 @@ import android.content.Intent
 import android.location.Location
 import android.os.IBinder
 import android.os.Looper
-import android.util.Log
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
@@ -28,7 +27,7 @@ class LocationService : Service() {
     private var prevLocation: Location? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "onStartCommand")
+        //Log.d(TAG, "onStartCommand")
 
         // call within 5 seconds from start
         showNotification()
@@ -37,7 +36,7 @@ class LocationService : Service() {
     }
 
     private fun showNotification() {
-        Log.d(TAG, "showNotification")
+        //Log.d(TAG, "showNotification")
 
         val view = RemoteViews(packageName, R.layout.location_notif)
 
@@ -60,7 +59,7 @@ class LocationService : Service() {
     }
 
     override fun onCreate() {
-        Log.d(TAG, "onCreate")
+        //Log.d(TAG, "onCreate")
         super.onCreate()
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
@@ -90,7 +89,7 @@ class LocationService : Service() {
                 Looper.myLooper()
             )
         } catch (e: SecurityException) {
-            Log.d(TAG, e.toString())
+            //Log.d(TAG, e.toString())
         }
     }
 
@@ -102,29 +101,30 @@ class LocationService : Service() {
                         onLocationUpdate(task.result)
                     }
                 } else {
-                    Log.d(TAG, "Failed to getLastKnownLocation")
+                    //Log.d(TAG, "Failed to getLastKnownLocation")
                 }
             }
 
         } catch (e: SecurityException) {
-            Log.d(TAG, e.toString())
+            //Log.d(TAG, e.toString())
         }
     }
 
     private fun onLocationUpdate(location: Location) {
-        Log.d(TAG, "onLocationUpdate " + location.latitude + " " + location.longitude)
+        //Log.d(TAG, "onLocationUpdate " + location.latitude + " " + location.longitude)
         prevLocation = location
         showNotification()
 
         val broadcastIntent = Intent(C.ACTION_LOCATION_UPDATE)
         broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, location.latitude)
         broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, location.longitude)
+        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_BEARING, location.bearing)
 
         LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
     }
 
     override fun onDestroy() {
-        Log.d(TAG, "onDestroy")
+        //Log.d(TAG, "onDestroy")
         super.onDestroy()
 
         fusedLocationClient.removeLocationUpdates(locationCallBack)

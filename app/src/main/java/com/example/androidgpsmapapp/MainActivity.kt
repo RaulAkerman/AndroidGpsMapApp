@@ -52,6 +52,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private var currentWaypoint: Marker? = null
     private val checkpoints = mutableListOf<Marker>()
     private var userLocation: LatLng? = null
+    private var userHeading: Float? = null
+    private var userDirectionalIndicator: Marker? = null
 
     private val polyLineOptions = PolylineOptions().width(10f).color(Color.RED)
     private var polyline : Polyline? = null
@@ -106,7 +108,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 addCheckpoint(userLocation!!)
             }
         }
-
     }
 
     private fun createNotificationChannel() {
@@ -180,6 +181,18 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         drawPath()
     }
 
+    fun addUserDirectionalIndicator(userLocation: LatLng, userHeading: Float) {
+        userDirectionalIndicator?.remove()
+
+        userDirectionalIndicator = mMap.addMarker(
+            MarkerOptions()
+                .title("User Directional Indicator")
+                .position(userLocation)
+                .rotation(userHeading)
+                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_YELLOW))
+        )
+    }
+
     fun drawPath() {
         markerPolyLine?.remove()
 
@@ -231,6 +244,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             polylineViewModel.waypoints = mutableListOf(currentWaypoint!!)
             outState.putSerializable(C.SAVED_WAYPOINTS, polylineViewModel.waypoints as ArrayList<Marker>)
         }
+        //Save buttonMainStartStopService text
+        outState.putString("buttonMainStartStopServiceText", buttonMainStartStopService.text.toString())
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
@@ -246,6 +261,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             polylineViewModel.waypoints =
                 savedInstanceState.getSerializable(C.SAVED_WAYPOINTS) as ArrayList<Marker>
         }
+        //Restore buttonMainStartStopService text
+        buttonMainStartStopService.text = savedInstanceState.getString("buttonMainStartStopServiceText")
     }
 
     fun restorePolyLine(){
@@ -292,10 +309,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             addWaypoint(latLng)
             drawPath()
         }
-        //Set on long click listener for map
-        mMap.setOnMapLongClickListener { latLng ->
-            addCheckpoint(latLng)
-            drawPath()
+
+        // add user directional indicatior
+        if (userLocation != null && userHeading != null) {
+            addUserDirectionalIndicator(userLocation!!, userHeading!!)
         }
 
         // Restore polyline from saved instance state
@@ -330,7 +347,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                         broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0),
                         broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0)
                     )
+                    userHeading = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_BEARING, 0.0f)
                     drawPath()
+                    addUserDirectionalIndicator(userLocation!!, userHeading!!)
                     textViewMainLat.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0).toString()
                     textViewMainLon.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0).toString()
                     updateLocation(broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0), broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0))
