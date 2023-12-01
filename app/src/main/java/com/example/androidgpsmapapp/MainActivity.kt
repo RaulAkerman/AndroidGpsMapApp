@@ -16,7 +16,9 @@ import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.PopupMenu
 import androidx.core.app.ActivityCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -40,6 +42,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private lateinit var textViewMainLat: TextView
     private lateinit var textViewMainLon: TextView
     private lateinit var mMap: GoogleMap
+    private lateinit var buttonOptions: Button
 
     private val innerBroadcastReceiver = InnerBroadcastReceiver()
     private val innerBroadcastReceiverIntentFilter = IntentFilter()
@@ -65,6 +68,22 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         buttonMainStartStopService = findViewById(R.id.buttonMainStartStopService)
         textViewMainLat = findViewById(R.id.textViewMainLat)
         textViewMainLon= findViewById(R.id.textViewMainLon)
+        buttonOptions = findViewById(R.id.buttonOptions)
+
+        buttonOptions.setOnClickListener {
+            // Initializing the popup menu and giving the reference as current context
+            val popupMenu = PopupMenu(this@MainActivity, buttonOptions)
+
+            // Inflating popup menu from popup_menu.xml file
+            popupMenu.menuInflater.inflate(R.menu.options_menu, popupMenu.menu)
+            popupMenu.setOnMenuItemClickListener { menuItem ->
+                // Toast message on menu item clicked
+                Toast.makeText(this@MainActivity, "You Clicked " + menuItem.title, Toast.LENGTH_SHORT).show()
+                true
+            }
+            // Showing the popup menu
+            popupMenu.show()
+        }
 
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
