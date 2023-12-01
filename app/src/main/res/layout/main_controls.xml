@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:layout_editor_absoluteX="218dp"
+        tools:layout_editor_absoluteY="114dp">
+
+        <Button
+            android:id="@+id/buttonMainStartStopService"
+            style="@style/Widget.AppCompat.Button"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:onClick="buttonMainStartStopServiceOnClick"
+            android:text="START"
+            app:autoSizeTextType="uniform"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/textViewSessionDurtation"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <Button
+            android:id="@+id/buttonMainAddCheckpoint"
+            style="@style/Widget.AppCompat.Button"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:onClick="buttonMainStartStopServiceOnClick"
+            android:text="CP"
+            app:autoSizeTextType="uniform"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/textViewDistanceToCP"
+            app:layout_constraintStart_toEndOf="@+id/guideline5"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="0.498" />
+
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/guideline5"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            app:layout_constraintGuide_percent="0.33" />
+
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/guideline6"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            app:layout_constraintGuide_percent="0.66" />
+
+        <TextView
+            android:id="@+id/textViewOverallDistance"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:text="Overall"
+            app:autoSizeTextType="uniform"
+            app:layout_constraintBottom_toTopOf="@+id/textViewSessionDurtation"
+            app:layout_constraintEnd_toStartOf="@+id/guideline5"
+            app:layout_constraintStart_toEndOf="@+id/buttonMainStartStopService"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/textViewAverageSpeed"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:text="AVG spd"
+            app:autoSizeTextType="uniform"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/guideline5"
+            app:layout_constraintStart_toEndOf="@+id/buttonMainStartStopService"
+            app:layout_constraintTop_toBottomOf="@+id/textViewSessionDurtation" />
+
+        <TextView
+            android:id="@+id/textViewSessionDurtation"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:text="Duration"
+            app:autoSizeTextType="uniform"
+            app:layout_constraintBottom_toTopOf="@+id/textViewAverageSpeed"
+            app:layout_constraintEnd_toStartOf="@+id/guideline5"
+            app:layout_constraintStart_toEndOf="@+id/buttonMainStartStopService"
+            app:layout_constraintTop_toBottomOf="@+id/textViewOverallDistance" />
+
+        <TextView
+            android:id="@+id/textViewDistanceToCP"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:text="Distance CP to current"
+            app:autoSizeTextType="uniform"
+            app:layout_constraintBottom_toTopOf="@+id/textViewDistanceToCPLine"
+            app:layout_constraintEnd_toStartOf="@+id/guideline6"
+            app:layout_constraintStart_toEndOf="@+id/buttonMainAddCheckpoint"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/textViewDistanceToCPLine"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:text="Distance CP to current (line)"
+            app:autoSizeTextType="uniform"
+            app:layout_constraintBottom_toTopOf="@+id/textViewAverageSpeedCP"
+            app:layout_constraintEnd_toStartOf="@+id/guideline6"
+            app:layout_constraintStart_toEndOf="@+id/buttonMainAddCheckpoint"
+            app:layout_constraintTop_toBottomOf="@+id/textViewDistanceToCP" />
+
+        <TextView
+            android:id="@+id/textViewAverageSpeedCP"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:text="AVG spd"
+            app:autoSizeTextType="uniform"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/guideline6"
+            app:layout_constraintStart_toEndOf="@+id/buttonMainAddCheckpoint"
+            app:layout_constraintTop_toBottomOf="@+id/textViewDistanceToCPLine" />
+
+        <Button
+            android:id="@+id/buttonMainAddWP"
+            style="@style/Widget.AppCompat.Button"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:text="WP"
+            app:autoSizeTextType="uniform"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/textViewDistanceToWP"
+            app:layout_constraintStart_toEndOf="@+id/guideline6"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="0.435" />
+
+        <TextView
+            android:id="@+id/textViewDistanceToWP"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:text="Distance WP to current"
+            app:autoSizeTextType="uniform"
+            app:layout_constraintBottom_toTopOf="@+id/textViewDistanceToWPLine"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/buttonMainAddWP"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/textViewDistanceToWPLine"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:text="Distance WP  to current (line)"
+            app:autoSizeTextType="uniform"
+            app:layout_constraintBottom_toTopOf="@+id/textViewAverageSpeedWP"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/buttonMainAddWP"
+            app:layout_constraintTop_toBottomOf="@+id/textViewDistanceToWP" />
+
+        <TextView
+            android:id="@+id/textViewAverageSpeedWP"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:text="AVG spd WP"
+            app:autoSizeTextType="uniform"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/buttonMainAddWP"
+            app:layout_constraintTop_toBottomOf="@+id/textViewDistanceToWPLine" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>
