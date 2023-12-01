@@ -11,13 +11,12 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.location.Location
 import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.os.PersistableBundle
 import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -95,7 +94,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             notificationManager.createNotificationChannel(channel)
         }
     }
-
 
     private fun checkLocationPermissions() {
         if (ActivityCompat.checkSelfPermission(
@@ -177,7 +175,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     
     override fun onResume() {
         super.onResume()
-
         LocalBroadcastManager.getInstance(this).registerReceiver(innerBroadcastReceiver, innerBroadcastReceiverIntentFilter)
     }
 
@@ -198,13 +195,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         polylineViewModel.polylinePoints = polyLineOptions.points
         outState.putSerializable(C.SAVED_POLYLINE_POINTS, polylineViewModel.polylinePoints as ArrayList<LatLng>)
         //Save markers to view model
-
+        Log.d(TAG, "CHECKPOINTS: $checkpoints")
+        polylineViewModel.checkpoints = checkpoints
+        outState.putSerializable(C.SAVED_CHECKPOINTS, polylineViewModel.checkpoints as ArrayList<Marker>)
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         super.onRestoreInstanceState(savedInstanceState)
         //Restore polyline from view model
         polylineViewModel.polylinePoints = savedInstanceState.getSerializable(C.SAVED_POLYLINE_POINTS) as ArrayList<LatLng>
+        //Restore markers from view model
+        polylineViewModel.checkpoints = savedInstanceState.getSerializable(C.SAVED_CHECKPOINTS) as ArrayList<Marker>
     }
 
     fun restorePolyLine(){
@@ -212,6 +213,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             polyLineOptions.addAll(it)
             polyline = mMap.addPolyline(polyLineOptions)
         }
+    }
+
+    fun restoreMarkers(){
+        if (polylineViewModel.checkpoints == null) return
+        for (checkpoint in polylineViewModel.checkpoints!!){
+            addCheckpoint(checkpoint.position)
+        }
+        // Draw path
+        drawPath()
     }
 
     fun buttonMainStartStopServiceOnClick(view: View) {
@@ -247,7 +257,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         // Restore polyline from saved instance state
         restorePolyLine()
 
-        // Add a marker in Sydney and move the camera
+        // Restore markers from saved instance state
+        restoreMarkers()
+
+        // Add a marker in Tallinn and move the camera
         val latLng = LatLng(59.0, 24.0)
         mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng))
         mMap.animateCamera(CameraUpdateFactory.zoomTo(15f))
@@ -276,7 +289,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 }
             }
         }
-
     }
 
     private fun calculateDistance(start: LatLng, end: LatLng): Float {
