@@ -7,4 +7,5 @@ import com.google.android.gms.maps.model.Marker
 class PolylineViewModel : ViewModel() {
     var polylinePoints: MutableList<LatLng>? = null
     var checkpoints: MutableList<Marker>? = null
+    var waypoints: MutableList<Marker>? = null
 }
