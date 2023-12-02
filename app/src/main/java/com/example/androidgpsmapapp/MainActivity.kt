@@ -16,9 +16,7 @@ import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.PopupMenu
 import androidx.core.app.ActivityCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -75,21 +73,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         textViewMainLon= findViewById(R.id.textViewMainLon)
         buttonOptions = findViewById(R.id.buttonOptions)
 
-        buttonOptions.setOnClickListener {
-            // Initializing the popup menu and giving the reference as current context
-            val popupMenu = PopupMenu(this@MainActivity, buttonOptions)
-
-            // Inflating popup menu from popup_menu.xml file
-            popupMenu.menuInflater.inflate(R.menu.options_menu, popupMenu.menu)
-            popupMenu.setOnMenuItemClickListener { menuItem ->
-                // Toast message on menu item clicked
-                Toast.makeText(this@MainActivity, "You Clicked " + menuItem.title, Toast.LENGTH_SHORT).show()
-                true
-            }
-            // Showing the popup menu
-            popupMenu.show()
-        }
-
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
@@ -108,6 +91,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 addCheckpoint(userLocation!!)
             }
         }
+
+        buttonOptions.setOnClickListener {
+            SwitchToSettingsActivity()
+        }
+    }
+
+    private fun SwitchToSettingsActivity() {
+        val intent = Intent(this@MainActivity, SettingsActivity::class.java)
+        startActivity(intent)
     }
 
     private fun createNotificationChannel() {
@@ -232,6 +224,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        Log.d(TAG, "onSaveInstanceState")
         super.onSaveInstanceState(outState)
         //Save polyline to view model
         polylineViewModel.polylinePoints = polyLineOptions.points
@@ -249,6 +242,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        Log.d(TAG, "onRestoreInstanceState")
         super.onRestoreInstanceState(savedInstanceState)
         //Restore polyline from view model
         polylineViewModel.polylinePoints =
@@ -266,6 +260,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     fun restorePolyLine(){
+        Log.d(TAG, "onRestoreLine")
         polylineViewModel.polylinePoints?.let {
             polyLineOptions.addAll(it)
             polyline = mMap.addPolyline(polyLineOptions)
