@@ -2,10 +2,9 @@ package com.example.androidgpsmapapp
 
 import androidx.lifecycle.ViewModel
 import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.Marker
 
 class PolylineViewModel : ViewModel() {
     var polylinePoints: MutableList<LatLng>? = null
-    var checkpoints: MutableList<Marker>? = null
-    var waypoints: MutableList<Marker>? = null
+    var checkpoints: MutableList<LatLng>? = null
+    var waypoints: MutableList<LatLng>? = null
 }

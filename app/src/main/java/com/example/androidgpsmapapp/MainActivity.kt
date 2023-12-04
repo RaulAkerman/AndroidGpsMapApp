@@ -50,12 +50,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private val innerBroadcastReceiverIntentFilter = IntentFilter()
 
     private var currentWaypoint: Marker? = null
-    private val checkpoints = mutableListOf<Marker>()
+    private val checkpoints = mutableListOf<LatLng>()
     private var userLocation: LatLng? = null
     private var userHeading: Float? = null
+    private var userSpeed: Float? = null
     private var userDirectionalIndicator: Marker? = null
 
-    private val polyLineOptions = PolylineOptions().width(10f).color(Color.RED)
+    private val polyLineOptions = PolylineOptions().width(10f)
     private var polyline : Polyline? = null
     private var markerPolyLine: Polyline? = null
     private var isMapReady = false
@@ -164,8 +165,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
         )
         if (checkpointMarker != null) {
-            //add checkpoint to checkpoints at the end
-            checkpoints.add(checkpointMarker)
+            //Save checkpoint LatLng
+            checkpoints.add(checkpointLatLng)
         }
     }
 
@@ -191,6 +192,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 .rotation(userHeading)
                 .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_YELLOW))
         )
+    }
+
+    fun polylineColor(): Int {
+        return when {
+            userSpeed == null -> Color.BLACK
+            userSpeed!! < 3 -> Color.BLUE
+            userSpeed!! < 5 -> Color.GREEN
+            else -> Color.RED
+        }
     }
 
     fun drawPath() {
@@ -232,35 +242,39 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        Log.d(TAG, "onSaveInstanceState")
         super.onSaveInstanceState(outState)
         //Save polyline to view model
         polylineViewModel.polylinePoints = polyLineOptions.points
-        outState.putSerializable(C.SAVED_POLYLINE_POINTS, polylineViewModel.polylinePoints as ArrayList<LatLng>)
+        outState.putSerializable(
+            C.SAVED_POLYLINE_POINTS, polylineViewModel.polylinePoints as ArrayList<LatLng>)
         //Save markers to view model
         polylineViewModel.checkpoints = checkpoints
-        outState.putSerializable(C.SAVED_CHECKPOINTS, polylineViewModel.checkpoints as ArrayList<Marker>)
+        outState.putSerializable(
+            C.SAVED_CHECKPOINTS, polylineViewModel.checkpoints as ArrayList<LatLng>)
         //Save waypoints to view model
         if (currentWaypoint != null) {
-            polylineViewModel.waypoints = mutableListOf(currentWaypoint!!)
-            outState.putSerializable(C.SAVED_WAYPOINTS, polylineViewModel.waypoints as ArrayList<Marker>)
+            polylineViewModel.waypoints = mutableListOf(currentWaypoint!!.position)
+            outState.putSerializable(
+                C.SAVED_WAYPOINTS, polylineViewModel.waypoints as ArrayList<LatLng>
+            )
         }
         //Save buttonMainStartStopService text
         outState.putString("buttonMainStartStopServiceText", buttonMainStartStopService.text.toString())
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        Log.d(TAG, "onRestoreInstanceState")
         super.onRestoreInstanceState(savedInstanceState)
         //Restore polyline from view model
         polylineViewModel.polylinePoints =
             savedInstanceState.getSerializable(C.SAVED_POLYLINE_POINTS) as ArrayList<LatLng>
         //Restore markers from view model
         polylineViewModel.checkpoints =
-            savedInstanceState.getSerializable(C.SAVED_CHECKPOINTS) as ArrayList<Marker>
+            savedInstanceState.getSerializable(C.SAVED_CHECKPOINTS) as ArrayList<LatLng>
         //Restore waypoints from view model
-        if (savedInstanceState.getSerializable(C.SAVED_WAYPOINTS) != null) {
-            polylineViewModel.waypoints =
-                savedInstanceState.getSerializable(C.SAVED_WAYPOINTS) as ArrayList<Marker>
-        }
+        polylineViewModel.waypoints =
+            savedInstanceState.getSerializable(C.SAVED_WAYPOINTS) as ArrayList<LatLng>
         //Restore buttonMainStartStopService text
         buttonMainStartStopService.text = savedInstanceState.getString("buttonMainStartStopServiceText")
     }
@@ -275,12 +289,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     fun restoreMarkers(){
         if (polylineViewModel.checkpoints != null) {
             for (checkpoint in polylineViewModel.checkpoints!!) {
-                addCheckpoint(checkpoint.position)
+                addCheckpoint(checkpoint)
             }
         }
         if (polylineViewModel.waypoints != null) {
             for (waypoint in polylineViewModel.waypoints!!) {
-                addWaypoint(waypoint.position)
+                addWaypoint(waypoint)
             }
         }
     }
@@ -331,8 +345,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         polyline?.remove()
 
         val latLng = LatLng(lat, lon)
-
-        polyLineOptions.add(latLng)
+        Log.d(TAG, "Speed: $userSpeed")
+        polyLineOptions.add(latLng).color(polylineColor())
 
         polyline = mMap.addPolyline(polyLineOptions)
 
@@ -348,11 +362,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                         broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0)
                     )
                     userHeading = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_BEARING, 0.0f)
-                    drawPath()
+                    userSpeed = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_SPEED, 0.0f)
                     addUserDirectionalIndicator(userLocation!!, userHeading!!)
                     textViewMainLat.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0).toString()
                     textViewMainLon.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0).toString()
                     updateLocation(broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0), broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0))
+                    drawPath()
                 }
             }
         }

@@ -119,6 +119,7 @@ class LocationService : Service() {
         broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, location.latitude)
         broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, location.longitude)
         broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_BEARING, location.bearing)
+        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_SPEED, location.speed)
 
         LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
     }
