@@ -1,10 +1,14 @@
 package com.example.androidgpsmapapp
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.location.Location
+import android.os.Build
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
@@ -36,17 +40,14 @@ class LocationService : Service() {
     }
 
     private fun showNotification() {
-        //Log.d(TAG, "showNotification")
+        // Log.d(TAG, "showNotification")
 
         val view = RemoteViews(packageName, R.layout.location_notif)
-
 
         view.setTextViewText(R.id.textViewLat, prevLocation?.latitude.toString())
         view.setTextViewText(R.id.textViewLon, prevLocation?.longitude.toString())
 
-
-        var builder = NotificationCompat
-            .Builder(this, C.NOTIFICATION_CHANNEL)
+        val builder = NotificationCompat.Builder(this, C.NOTIFICATION_CHANNEL)
             .setSmallIcon(androidx.core.R.drawable.notification_bg)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setCustomContentView(view)
@@ -54,6 +55,18 @@ class LocationService : Service() {
             .setOngoing(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setSound(null)
+
+        // For API 26 and above, you may want to explicitly set the notification channel
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                C.NOTIFICATION_CHANNEL,
+                "Notification channel",
+                NotificationManager.IMPORTANCE_LOW
+            )
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager.createNotificationChannel(channel)
+            builder.setChannelId(C.NOTIFICATION_CHANNEL)
+        }
 
         startForeground(1, builder.build())
     }
@@ -116,7 +129,7 @@ class LocationService : Service() {
         if (prevLocation != null) {
             val distance = prevLocation!!.distanceTo(location)
 
-            if (distance in 2.0..50.0) {
+            if (distance in 3.0..50.0) {
                 // The distance is between 5 and 100 meters, send location update
                 prevLocation = location
                 showNotification()
