@@ -343,7 +343,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
         polyline = mMap.addPolyline(polyLineOptions)
 
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng))
+        if (isMapReady) {
+            mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng))
+        }
     }
 
     private inner class InnerBroadcastReceiver: BroadcastReceiver(){
