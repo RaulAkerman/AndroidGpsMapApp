@@ -16,6 +16,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.RemoteViews
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -59,7 +60,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private var userHeading: Float? = null
     private var userSpeed: Float? = null
     private var userAccuracy: Float? = null
-    private var userAltitude: Float? = null
+    private var userAltitude: Double? = null
     private var userVerticalAccuracy: Float? = null
     private var userDirectionalIndicator: Marker? = null
 
@@ -80,7 +81,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
         buttonMainStartStopService = findViewById(R.id.buttonMainStartStopService)
         textViewMainLat = findViewById(R.id.textViewMainLat)
-        textViewMainLon= findViewById(R.id.textViewMainLon)
+        textViewMainLon = findViewById(R.id.textViewMainLon)
         buttonOptions = findViewById(R.id.buttonOptions)
 
         val mapFragment = supportFragmentManager
@@ -379,7 +380,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                     userHeading = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_BEARING, 0.0f)
                     userSpeed = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_SPEED, 0.0f)
                     userAccuracy = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_ACCURACY, 0.0f)
-                    userAltitude = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_ALTITUDE, 0.0f)
+                    userAltitude = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_ALTITUDE, 0.0)
                     userVerticalAccuracy = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_VERTICAL_ACCURACY, 0.0f)
                     addUserDirectionalIndicator(userLocation!!, userHeading!!)
                     textViewMainLat.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0).toString()

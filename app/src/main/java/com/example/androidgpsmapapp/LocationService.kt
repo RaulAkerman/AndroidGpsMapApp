@@ -2,13 +2,13 @@ package com.example.androidgpsmapapp
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.location.Location
 import android.os.Build
 import android.os.IBinder
 import android.os.Looper
-import android.util.Log
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
@@ -29,7 +29,6 @@ class LocationService : Service() {
     private lateinit var locationCallBack: LocationCallback
 
     private var prevLocation: Location? = null
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         //Log.d(TAG, "onStartCommand")
 
@@ -162,7 +161,6 @@ class LocationService : Service() {
             LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
         }
     }
-
 
     override fun onDestroy() {
         //Log.d(TAG, "onDestroy")
