@@ -1,5 +1,6 @@
 package com.example.androidgpsmapapp
 
+import HttpSingletonHandler
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -20,6 +21,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.android.volley.Request
+import com.android.volley.Response
+import com.android.volley.toolbox.StringRequest
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -30,6 +34,7 @@ import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.Polyline
 import com.google.android.gms.maps.model.PolylineOptions
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapClickListener {
     companion object {
@@ -53,6 +58,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private var userLocation: LatLng? = null
     private var userHeading: Float? = null
     private var userSpeed: Float? = null
+    private var userAccuracy: Float? = null
+    private var userAltitude: Float? = null
+    private var userVerticalAccuracy: Float? = null
     private var userDirectionalIndicator: Marker? = null
 
     private val polyLineOptions = PolylineOptions().width(10f)
@@ -254,6 +262,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         }
         //Save buttonMainStartStopService text
         outState.putString("buttonMainStartStopServiceText", buttonMainStartStopService.text.toString())
+        //Save user location
+        if (userLocation != null) {
+            outState.putDouble("userLocationLat", userLocation!!.latitude)
+            outState.putDouble("userLocationLon", userLocation!!.longitude)
+        }
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
@@ -266,10 +279,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         polylineViewModel.checkpoints =
             savedInstanceState.getSerializable(C.SAVED_CHECKPOINTS) as ArrayList<LatLng>
         //Restore waypoints from view model
-        polylineViewModel.waypoints =
-            savedInstanceState.getSerializable(C.SAVED_WAYPOINTS) as ArrayList<LatLng>
+        if (savedInstanceState.getSerializable(C.SAVED_WAYPOINTS) != null) {
+            polylineViewModel.waypoints =
+                savedInstanceState.getSerializable(C.SAVED_WAYPOINTS) as ArrayList<LatLng>
+        }
         //Restore buttonMainStartStopService text
         buttonMainStartStopService.text = savedInstanceState.getString("buttonMainStartStopServiceText")
+        //Restore user location
+        userLocation = LatLng(
+            savedInstanceState.getDouble("userLocationLat"),
+            savedInstanceState.getDouble("userLocationLon")
+        )
     }
 
     fun restorePolyLine(){
@@ -330,9 +350,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         restoreMarkers()
 
         // Add a marker in Tallinn and move the camera
-        val latLng = LatLng(59.0, 24.0)
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng))
-        mMap.animateCamera(CameraUpdateFactory.zoomTo(15f))
+        //val latLng = LatLng(59.0, 24.0)
+        //mMap.moveCamera(CameraUpdateFactory.newLatLng(userLocation))
+        //mMap.animateCamera(CameraUpdateFactory.zoomTo(15f))
     }
 
     private fun updateLocation(lat: Double, lon: Double){
@@ -358,6 +378,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                     )
                     userHeading = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_BEARING, 0.0f)
                     userSpeed = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_SPEED, 0.0f)
+                    userAccuracy = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_ACCURACY, 0.0f)
+                    userAltitude = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_ALTITUDE, 0.0f)
+                    userVerticalAccuracy = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_VERTICAL_ACCURACY, 0.0f)
                     addUserDirectionalIndicator(userLocation!!, userHeading!!)
                     textViewMainLat.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0).toString()
                     textViewMainLon.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0).toString()
@@ -386,4 +409,194 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         alertDialogBuilder.setNegativeButton("No") { _, _ -> }
         alertDialogBuilder.create().show()
     }
+
+    //TODO: some of the values passed to the api are temporary and should be replaced later.
+
+    fun onClickregister(view: android.view.View) {
+        var url = "https://sportmap.akaver.com/api/v1.0/account/register"
+        var handler = HttpSingletonHandler.getInstance(this)
+
+        var httpRequest = object : StringRequest(
+            Request.Method.POST,
+            url,
+            Response.Listener { response -> Log.d("Response.Listener", response);
+                val sharedPref = this.getPreferences(Context.MODE_PRIVATE) ?: return@Listener
+                with (sharedPref.edit()) {
+                    putString("token", JSONObject(response).getString("token"))
+                    apply()
+                } },
+            Response.ErrorListener { error ->  Log.d("Response.ErrorListener", "${error.message} ${error.networkResponse.statusCode}")}
+        ){
+            override fun getBodyContentType(): String {
+                return "application/json"
+            }
+            override fun getBody(): ByteArray {
+                val params = HashMap<String, String>()
+                params["email"] = "user123456789@user.ee"
+                params["password"] = "Foo.bar.1"
+                params["firstName"] = "firstName"
+                params["lastName"] = "lastName"
+
+                var body = JSONObject(params as Map<*, *>).toString()
+                Log.d("getBody", body)
+
+                return body.toByteArray()
+            }
+        }
+        handler.addToRequestQueue(httpRequest)
+    }
+
+    fun onClicklogin(view: android.view.View) {
+        val url = "https://sportmap.akaver.com/api/v1.0/account/login"
+        val handler = HttpSingletonHandler.getInstance(this)
+
+
+        //Save the token from the response json to shared preferences
+        val httpRequest = object : StringRequest(
+            Request.Method.POST,
+            url,
+            Response.Listener { response -> Log.d("Response.Listener", response);
+                val sharedPref = this.getPreferences(Context.MODE_PRIVATE) ?: return@Listener
+                with (sharedPref.edit()) {
+                    putString("token", JSONObject(response).getString("token"))
+                    apply()
+                } },
+            Response.ErrorListener { error ->  Log.d("Response.ErrorListener", "${error.message} ${error.networkResponse.statusCode}")}
+        ){
+            override fun getBodyContentType(): String {
+                return "application/json"
+            }
+            override fun getBody(): ByteArray {
+                val params = HashMap<String, String>()
+                params["email"] = "user123456789@user.ee"
+                params["password"] = "Foo.bar.1"
+
+                val body = JSONObject(params as Map<*, *>).toString()
+                Log.d("getBody", body)
+
+                return body.toByteArray()
+            }
+        }
+        handler.addToRequestQueue(httpRequest)
+    }
+
+    fun startSession() {
+        val url = "https://sportmap.akaver.com/api/v1.0/GpsSessions"
+        val handler = HttpSingletonHandler.getInstance(this)
+
+        val httpRequest = object : StringRequest(
+            Request.Method.POST,
+            url,
+            Response.Listener { response -> Log.d("Response.Listener", response);
+                val sharedPref = this.getPreferences(Context.MODE_PRIVATE) ?: return@Listener
+                with (sharedPref.edit()) {
+                    putString("session_id", JSONObject(response).getString("id"))
+                    apply()
+                } },
+            Response.ErrorListener { error ->
+                Log.d(
+                    "Response.ErrorListener",
+                    "${error.message} ${error.networkResponse.statusCode}"
+                )
+            }
+        ) {
+            override fun getBodyContentType(): String {
+                return "application/json"
+            }
+
+            override fun getBody(): ByteArray {
+                val params = HashMap<String, Any?>()
+                val currentDate = java.util.Calendar.getInstance().time
+                params["name"] = "sessionName"
+                params["description"] = "sessionDescription"
+                params["recordedAt"] = currentDate
+                params["minSpeed"] = 420
+                params["maxSpeed"] = 600
+
+                val body = JSONObject(params as Map<*, *>).toString()
+                Log.d("getBody", body)
+
+                return body.toByteArray()
+            }
+        }
+        handler.addToRequestQueue(httpRequest)
+    }
+
+    //Gets the location types, unnecessary since they are hardcoded in the backend
+    fun getLocationTypes() {
+        val url = "https://sportmap.akaver.com/api/v1.0/GpsLocationTypes"
+        val handler = HttpSingletonHandler.getInstance(this)
+
+        val httpRequest = object : StringRequest(
+            Request.Method.GET,
+            url,
+            Response.Listener { response -> Log.d("Response.Listener", response);
+                val sharedPref = this.getPreferences(Context.MODE_PRIVATE) ?: return@Listener
+                with (sharedPref.edit()) {
+                    putString("gps_location_types", response)
+                    apply()
+                } },
+            Response.ErrorListener { error ->
+                Log.d(
+                    "Response.ErrorListener",
+                    "${error.message} ${error.networkResponse.statusCode}"
+                )
+            }
+        )
+        {
+            override fun getBodyContentType(): String {
+                return "application/json"
+            }
+        }
+        handler.addToRequestQueue(httpRequest)
+    }
+
+    fun updateSession() {
+        val url = "https://sportmap.akaver.com/api/v1.0/GpsLocations"
+        val handler = HttpSingletonHandler.getInstance(this)
+
+        val httpRequest = object : StringRequest(
+            Request.Method.POST,
+            url,
+            Response.Listener { response -> Log.d("Response.Listener", response);
+                val sharedPref = this.getPreferences(Context.MODE_PRIVATE) ?: return@Listener
+                with (sharedPref.edit()) {
+                    remove("latest_location_update")
+                    putString("latest_location_update", response)
+                    apply()
+                } },
+            Response.ErrorListener { error ->
+                Log.d(
+                    "Response.ErrorListener",
+                    "${error.message} ${error.networkResponse.statusCode}"
+                )
+            }
+        ) {
+            override fun getBodyContentType(): String {
+                return "application/json"
+            }
+
+            override fun getBody(): ByteArray {
+                val params = HashMap<String, Any?>()
+                //Get shared preferences
+                val savedPreferences = getPreferences(Context.MODE_PRIVATE)
+                val gpsSessionId = savedPreferences.getString("session_id", "")
+                params["recordedAt"] = "2021-11-11T11:11:11.111Z"
+                params["latitude"] = userLocation?.latitude
+                params["Longitude"] = userLocation?.longitude
+                params["accuracy"] = userAccuracy
+                params["altitude"] = userAltitude
+                params["verticalAccuracy"] = userVerticalAccuracy
+                params["gpsSessionId"] = gpsSessionId
+                params["gpsLocationTypeId"] = "00000000-0000-0000-0000-000000000001"
+
+                val body = JSONObject(params as Map<*, *>).toString()
+                Log.d("getBody", body)
+
+                return body.toByteArray()
+            }
+        }
+        handler.addToRequestQueue(httpRequest)
+    }
+
 }

@@ -7,4 +7,5 @@ class PolylineViewModel : ViewModel() {
     var polylinePoints: MutableList<LatLng>? = null
     var checkpoints: MutableList<LatLng>? = null
     var waypoints: MutableList<LatLng>? = null
+    var userLocationMarker: MutableList<LatLng>? = null
 }

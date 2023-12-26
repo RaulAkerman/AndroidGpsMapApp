@@ -139,6 +139,9 @@ class LocationService : Service() {
                 broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, location.longitude)
                 broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_BEARING, location.bearing)
                 broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_SPEED, location.speed)
+                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_ACCURACY, location.accuracy)
+                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_ALTITUDE, location.altitude)
+                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_VERTICAL_ACCURACY, location.verticalAccuracyMeters)
 
                 LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
             }
@@ -152,6 +155,9 @@ class LocationService : Service() {
             broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, location.longitude)
             broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_BEARING, location.bearing)
             broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_SPEED, location.speed)
+            broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_ACCURACY, location.accuracy)
+            broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_ALTITUDE, location.altitude)
+            broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_VERTICAL_ACCURACY, location.verticalAccuracyMeters)
 
             LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
         }
