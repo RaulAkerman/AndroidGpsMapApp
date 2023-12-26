@@ -111,18 +111,39 @@ class LocationService : Service() {
     }
 
     private fun onLocationUpdate(location: Location) {
-        //Log.d(TAG, "onLocationUpdate " + location.latitude + " " + location.longitude)
-        prevLocation = location
-        showNotification()
+        // Log.d(TAG, "onLocationUpdate " + location.latitude + " " + location.longitude)
 
-        val broadcastIntent = Intent(C.ACTION_LOCATION_UPDATE)
-        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, location.latitude)
-        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, location.longitude)
-        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_BEARING, location.bearing)
-        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_SPEED, location.speed)
+        if (prevLocation != null) {
+            val distance = prevLocation!!.distanceTo(location)
 
-        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+            if (distance in 2.0..50.0) {
+                // The distance is between 5 and 100 meters, send location update
+                prevLocation = location
+                showNotification()
+
+                val broadcastIntent = Intent(C.ACTION_LOCATION_UPDATE)
+                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, location.latitude)
+                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, location.longitude)
+                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_BEARING, location.bearing)
+                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_SPEED, location.speed)
+
+                LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+            }
+        } else {
+            // This is the first location update, send it regardless of distance
+            prevLocation = location
+            showNotification()
+
+            val broadcastIntent = Intent(C.ACTION_LOCATION_UPDATE)
+            broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, location.latitude)
+            broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, location.longitude)
+            broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_BEARING, location.bearing)
+            broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_SPEED, location.speed)
+
+            LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+        }
     }
+
 
     override fun onDestroy() {
         //Log.d(TAG, "onDestroy")
