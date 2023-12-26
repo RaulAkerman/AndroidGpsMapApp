@@ -16,6 +16,7 @@ import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
@@ -294,18 +295,18 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
     fun buttonMainStartStopServiceOnClick(view: View) {
         val serviceIntent = Intent(this, LocationService::class.java)
+
         if (locationServiceRunning) {
-            stopService(serviceIntent)
+            showStopServiceConfirmationDialog(serviceIntent)
         } else {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(serviceIntent)
             } else {
                 startService(serviceIntent)
             }
+            locationServiceRunning = true
+            buttonMainStartStopService.text = "STOP"
         }
-        locationServiceRunning = !locationServiceRunning
-
-        buttonMainStartStopService.text = if (locationServiceRunning) "STOP" else "START"
     }
 
     override fun onMapReady(googleMap: GoogleMap) {
@@ -371,5 +372,18 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         val results = FloatArray(1)
         Location.distanceBetween(start.latitude, start.longitude, end.latitude, end.longitude, results)
         return results[0]
+    }
+
+    private fun showStopServiceConfirmationDialog(serviceIntent: Intent) {
+        val alertDialogBuilder = AlertDialog.Builder(this)
+        alertDialogBuilder.setTitle("Confirmation")
+        alertDialogBuilder.setMessage("Are you sure you want to stop the service?")
+        alertDialogBuilder.setPositiveButton("Yes") { _, _ ->
+            stopService(serviceIntent)
+            locationServiceRunning = false
+            buttonMainStartStopService.text = "START"
+        }
+        alertDialogBuilder.setNegativeButton("No") { _, _ -> }
+        alertDialogBuilder.create().show()
     }
 }
