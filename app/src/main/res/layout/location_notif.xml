@@ -21,9 +21,9 @@
         android:text="TextView" />
 
     <Button
-        android:id="@+id/buttonAction"
+        android:id="@+id/buttonPlaceCheckpoint"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Button" />
+        android:text="Add CP" />
 </LinearLayout>

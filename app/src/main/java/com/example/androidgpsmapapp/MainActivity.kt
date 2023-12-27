@@ -89,6 +89,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         mapFragment.getMapAsync(this)
 
         innerBroadcastReceiverIntentFilter.addAction(C.ACTION_LOCATION_UPDATE)
+        innerBroadcastReceiverIntentFilter.addAction(C.ACTION_PLACE_CHECKPOINT)
+        innerBroadcastReceiverIntentFilter.addAction(LocationService.ACTION_ADD_CHECKPOINT_BROADCAST)
 
         checkLocationPermissions()
 
@@ -387,6 +389,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                     textViewMainLon.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0).toString()
                     updateLocation(broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0), broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0))
                     drawPath()
+                }
+                C.ACTION_PLACE_CHECKPOINT -> {
+                    Log.d(TAG, "ACTION_PLACE_CHECKPOINT")
+                    val checkpointLatLng = LatLng(
+                        broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0),
+                        broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0)
+                    )
+                    addCheckpoint(checkpointLatLng)
                 }
             }
         }

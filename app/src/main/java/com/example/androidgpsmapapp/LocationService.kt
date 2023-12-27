@@ -4,11 +4,13 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.location.Location
 import android.os.Build
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
@@ -21,7 +23,8 @@ import com.google.android.gms.location.Priority
 
 class LocationService : Service() {
     companion object {
-        private val TAG = this::class.java.declaringClass!!.simpleName
+        const val TAG = "LocationService"
+        const val ACTION_ADD_CHECKPOINT_BROADCAST = "com.example.androidgpsmapapp.ADD_CHECKPOINT_BROADCAST"
     }
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -29,22 +32,36 @@ class LocationService : Service() {
     private lateinit var locationCallBack: LocationCallback
 
     private var prevLocation: Location? = null
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        //Log.d(TAG, "onStartCommand")
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // call within 5 seconds from start
         showNotification()
+        Log.d(TAG, "onStartCommand")
+        if (intent?.action == ACTION_ADD_CHECKPOINT_BROADCAST) {
+            sendAddCheckpointBroadcast()
+        }
 
         return START_STICKY
     }
 
     private fun showNotification() {
-        // Log.d(TAG, "showNotification")
-
         val view = RemoteViews(packageName, R.layout.location_notif)
 
         view.setTextViewText(R.id.textViewLat, prevLocation?.latitude.toString())
         view.setTextViewText(R.id.textViewLon, prevLocation?.longitude.toString())
+
+        // Create an intent for the button click event
+        val buttonIntent = Intent(this, LocationService::class.java)
+        buttonIntent.action = ACTION_ADD_CHECKPOINT_BROADCAST
+        val buttonPendingIntent = PendingIntent.getService(
+            this,
+            0,
+            buttonIntent,
+            PendingIntent.FLAG_MUTABLE
+        )
+
+        // Set the click event for the button in the RemoteViews
+        view.setOnClickPendingIntent(R.id.buttonPlaceCheckpoint, buttonPendingIntent)
 
         val builder = NotificationCompat.Builder(this, C.NOTIFICATION_CHANNEL)
             .setSmallIcon(androidx.core.R.drawable.notification_bg)
@@ -70,8 +87,15 @@ class LocationService : Service() {
         startForeground(1, builder.build())
     }
 
+    private fun sendAddCheckpointBroadcast() {
+        Log.d(TAG, "sendAddCheckpointBroadcast")
+        val broadcastIntent = Intent(C.ACTION_PLACE_CHECKPOINT)
+        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, prevLocation?.latitude)
+        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, prevLocation?.longitude)
+        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+    }
+
     override fun onCreate() {
-        //Log.d(TAG, "onCreate")
         super.onCreate()
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
@@ -101,7 +125,7 @@ class LocationService : Service() {
                 Looper.myLooper()
             )
         } catch (e: SecurityException) {
-            //Log.d(TAG, e.toString())
+            // Handle the exception
         }
     }
 
@@ -113,64 +137,50 @@ class LocationService : Service() {
                         onLocationUpdate(task.result)
                     }
                 } else {
-                    //Log.d(TAG, "Failed to getLastKnownLocation")
+                    // Handle the exception
                 }
             }
 
         } catch (e: SecurityException) {
-            //Log.d(TAG, e.toString())
+            // Handle the exception
         }
     }
 
     private fun onLocationUpdate(location: Location) {
-        // Log.d(TAG, "onLocationUpdate " + location.latitude + " " + location.longitude)
-
         if (prevLocation != null) {
             val distance = prevLocation!!.distanceTo(location)
 
             if (distance in 3.0..50.0) {
-                // The distance is between 5 and 100 meters, send location update
                 prevLocation = location
                 showNotification()
-
-                val broadcastIntent = Intent(C.ACTION_LOCATION_UPDATE)
-                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, location.latitude)
-                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, location.longitude)
-                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_BEARING, location.bearing)
-                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_SPEED, location.speed)
-                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_ACCURACY, location.accuracy)
-                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_ALTITUDE, location.altitude)
-                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_VERTICAL_ACCURACY, location.verticalAccuracyMeters)
-
-                LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+                sendLocationUpdateBroadcast(location)
             }
         } else {
-            // This is the first location update, send it regardless of distance
             prevLocation = location
             showNotification()
-
-            val broadcastIntent = Intent(C.ACTION_LOCATION_UPDATE)
-            broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, location.latitude)
-            broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, location.longitude)
-            broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_BEARING, location.bearing)
-            broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_SPEED, location.speed)
-            broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_ACCURACY, location.accuracy)
-            broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_ALTITUDE, location.altitude)
-            broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_VERTICAL_ACCURACY, location.verticalAccuracyMeters)
-
-            LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+            sendLocationUpdateBroadcast(location)
         }
     }
 
-    override fun onDestroy() {
-        //Log.d(TAG, "onDestroy")
-        super.onDestroy()
+    private fun sendLocationUpdateBroadcast(location: Location) {
+        val broadcastIntent = Intent(C.ACTION_LOCATION_UPDATE)
+        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, location.latitude)
+        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, location.longitude)
+        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_BEARING, location.bearing)
+        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_SPEED, location.speed)
+        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_ACCURACY, location.accuracy)
+        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_ALTITUDE, location.altitude)
+        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_VERTICAL_ACCURACY, location.verticalAccuracyMeters)
+        Log.d(TAG, "sendLocationUpdateBroadcast")
+        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+    }
 
+    override fun onDestroy() {
+        super.onDestroy()
         fusedLocationClient.removeLocationUpdates(locationCallBack)
     }
 
-    override fun onBind(intent: Intent): IBinder {
-        TODO("Return the communication channel to the service.")
+    override fun onBind(intent: Intent): IBinder? {
+        return null
     }
-
 }
