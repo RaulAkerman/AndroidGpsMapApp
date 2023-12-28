@@ -48,6 +48,11 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
+        <service
+            android:name=".TimerService"
+            android:enabled="true"
+            android:exported="false"/>
+
         <activity
             android:name=".MainActivity"
             android:exported="true">

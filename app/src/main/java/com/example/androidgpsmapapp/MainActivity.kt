@@ -50,6 +50,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private lateinit var textViewMainLon: TextView
     private lateinit var mMap: GoogleMap
     private lateinit var buttonOptions: Button
+    private lateinit var textViewTimer: TextView
 
     private val innerBroadcastReceiver = InnerBroadcastReceiver()
     private val innerBroadcastReceiverIntentFilter = IntentFilter()
@@ -63,6 +64,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private var userAltitude: Double? = null
     private var userVerticalAccuracy: Float? = null
     private var userDirectionalIndicator: Marker? = null
+
+    private var timerValue = "0"
 
     private val polyLineOptions = PolylineOptions().width(10f)
     private var polyline : Polyline? = null
@@ -83,6 +86,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         textViewMainLat = findViewById(R.id.textViewMainLat)
         textViewMainLon = findViewById(R.id.textViewMainLon)
         buttonOptions = findViewById(R.id.buttonOptions)
+        textViewTimer = findViewById(R.id.textViewSessionDurtation)
+        buttonMainAddCheckpoint = findViewById(R.id.buttonMainAddCheckpoint)
+
+        textViewTimer.text = timerValue
 
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
@@ -92,11 +99,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         innerBroadcastReceiverIntentFilter.addAction(C.ACTION_PLACE_CHECKPOINT)
         innerBroadcastReceiverIntentFilter.addAction(LocationService.ACTION_ADD_CHECKPOINT_BROADCAST)
 
+        innerBroadcastReceiverIntentFilter.addAction(C.ACTION_TIMER)
+        innerBroadcastReceiverIntentFilter.addAction(C.ACTION_TIMER_SERVICE_START)
+        innerBroadcastReceiverIntentFilter.addAction(C.ACTION_TIMER_SERVICE_DESTROY)
+
         checkLocationPermissions()
-
         createNotificationChannel()
-
-        buttonMainAddCheckpoint = findViewById(R.id.buttonMainAddCheckpoint)
 
         //Set on click listener for add checkpoint button
         buttonMainAddCheckpoint.setOnClickListener {
@@ -318,14 +326,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
     fun buttonMainStartStopServiceOnClick(view: View) {
         val serviceIntent = Intent(this, LocationService::class.java)
+        val timerServiceIntent = Intent(this, TimerService::class.java)
 
         if (locationServiceRunning) {
             showStopServiceConfirmationDialog(serviceIntent)
         } else {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(serviceIntent)
+                startService(timerServiceIntent)
             } else {
                 startService(serviceIntent)
+                startService(timerServiceIntent)
             }
             locationServiceRunning = true
             buttonMainStartStopService.text = "STOP"
@@ -371,6 +382,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
     }
 
+    private fun resetUiState() {
+        val resetIntent = Intent(this, TimerService::class.java)
+        stopService(resetIntent)
+
+        timerValue = "00:00:00"
+        textViewTimer.text = timerValue
+    }
+
+
     private inner class InnerBroadcastReceiver: BroadcastReceiver(){
         override fun onReceive(context: Context?, broadcastIntent: Intent?) {
             when (broadcastIntent!!.action){
@@ -398,8 +418,25 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                     )
                     addCheckpoint(checkpointLatLng)
                 }
+                C.ACTION_TIMER -> {
+                    val payloadTime = broadcastIntent.getStringExtra(C.PAYLOAD_TIME)
+                    Log.d(TAG, "Payload Time: $payloadTime")
+
+                    val seconds = payloadTime?.toIntOrNull() ?: 0
+                    val formattedTime = formatTime(seconds)
+                    timerValue = formattedTime
+                    textViewTimer.text = formattedTime
+                }
             }
         }
+    }
+
+    private fun formatTime(seconds: Int): String {
+        val hours = seconds / 3600
+        val minutes = (seconds % 3600) / 60
+        val remainingSeconds = seconds % 60
+
+        return String.format("%02d:%02d:%02d", hours, minutes, remainingSeconds)
     }
 
     private fun calculateDistance(start: LatLng, end: LatLng): Float {
@@ -409,11 +446,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     private fun showStopServiceConfirmationDialog(serviceIntent: Intent) {
+        val timerServiceIntent = Intent(this, TimerService::class.java)
+
         val alertDialogBuilder = AlertDialog.Builder(this)
         alertDialogBuilder.setTitle("Confirmation")
         alertDialogBuilder.setMessage("Are you sure you want to stop the service?")
         alertDialogBuilder.setPositiveButton("Yes") { _, _ ->
             stopService(serviceIntent)
+            stopService(timerServiceIntent)
+            resetUiState()
             locationServiceRunning = false
             buttonMainStartStopService.text = "START"
         }
