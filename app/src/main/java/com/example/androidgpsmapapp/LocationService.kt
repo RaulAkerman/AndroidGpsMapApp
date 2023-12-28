@@ -150,7 +150,7 @@ class LocationService : Service() {
         if (prevLocation != null) {
             val distance = prevLocation!!.distanceTo(location)
 
-            if (distance in 3.0..50.0) {
+            if (distance in 1.0..500.0) {
                 prevLocation = location
                 showNotification()
                 sendLocationUpdateBroadcast(location)

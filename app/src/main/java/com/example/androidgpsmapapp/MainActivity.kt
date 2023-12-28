@@ -16,7 +16,6 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Button
-import android.widget.RemoteViews
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -30,6 +29,7 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
@@ -194,18 +194,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         drawPath()
     }
 
-    fun addUserDirectionalIndicator(userLocation: LatLng, userHeading: Float) {
-        userDirectionalIndicator?.remove()
-
-        userDirectionalIndicator = mMap.addMarker(
-            MarkerOptions()
-                .title("User Directional Indicator")
-                .position(userLocation)
-                .rotation(userHeading)
-                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_YELLOW))
-        )
-    }
-
     fun polylineColor(): Int {
         return when {
             userSpeed == null -> Color.BLACK
@@ -350,23 +338,71 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         mMap.setOnMapClickListener { latLng ->
             addWaypoint(latLng)
             drawPath()
+//            updateMapOrientation()
         }
 
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return
+        }
+
+        mMap.isMyLocationEnabled = true;
         // add user directional indicatior
         if (userLocation != null && userHeading != null) {
-            addUserDirectionalIndicator(userLocation!!, userHeading!!)
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation!!, 18f))
         }
 
         // Restore polyline from saved instance state
         restorePolyLine()
-
-        // Restore markers from saved instance state
         restoreMarkers()
+    }
 
-        // Add a marker in Tallinn and move the camera
-        //val latLng = LatLng(59.0, 24.0)
-        //mMap.moveCamera(CameraUpdateFactory.newLatLng(userLocation))
-        //mMap.animateCamera(CameraUpdateFactory.zoomTo(15f))
+    private fun updateMapOrientation() {
+        val isNorthUpEnabled = true
+        if (isNorthUpEnabled) {
+            // If "keep north-up" is enabled, set the map orientation to the user's bearing
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                // TODO: Consider calling
+                //    ActivityCompat#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for ActivityCompat#requestPermissions for more details.
+                return
+            }
+            mMap.isMyLocationEnabled = true
+            val userBearing = mMap.myLocation.bearing ?: 0f
+            mMap.animateCamera(
+                CameraUpdateFactory.newCameraPosition(
+                    CameraPosition.Builder(mMap.cameraPosition).bearing(userBearing).build()
+                )
+            )
+        } else {
+            // If "keep north-up" is disabled, reset the map orientation to default
+            mMap.isMyLocationEnabled = true // You can set it to false if you don't want to show the location dot
+            mMap.animateCamera(CameraUpdateFactory.newLatLng(mMap.cameraPosition.target))
+        }
     }
 
     private fun updateLocation(lat: Double, lon: Double){
@@ -378,7 +414,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
         polyline = mMap.addPolyline(polyLineOptions)
 
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng))
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation!!, 18f))
 
     }
 
@@ -404,7 +440,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                     userAccuracy = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_ACCURACY, 0.0f)
                     userAltitude = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_ALTITUDE, 0.0)
                     userVerticalAccuracy = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_VERTICAL_ACCURACY, 0.0f)
-                    addUserDirectionalIndicator(userLocation!!, userHeading!!)
                     textViewMainLat.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0).toString()
                     textViewMainLon.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0).toString()
                     updateLocation(broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0), broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0))
