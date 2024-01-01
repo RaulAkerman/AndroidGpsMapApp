@@ -10,12 +10,16 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorManager
 import android.location.Location
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -36,8 +40,13 @@ import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.Polyline
 import com.google.android.gms.maps.model.PolylineOptions
 import org.json.JSONObject
+import android.hardware.SensorEventListener
+import android.view.animation.Animation
+import android.view.animation.Animation.RELATIVE_TO_SELF
+import android.view.animation.RotateAnimation
+import java.lang.Math.toDegrees
 
-class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapClickListener {
+class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapClickListener, SensorEventListener {
     companion object {
         private val TAG = this::class.java.declaringClass!!.simpleName
     }
@@ -51,6 +60,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private lateinit var mMap: GoogleMap
     private lateinit var buttonOptions: Button
     private lateinit var textViewTimer: TextView
+    private lateinit var buttonCompass: Button
 
     private val innerBroadcastReceiver = InnerBroadcastReceiver()
     private val innerBroadcastReceiverIntentFilter = IntentFilter()
@@ -72,6 +82,21 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private var markerPolyLine: Polyline? = null
     private var isMapReady = false
 
+    //Compass
+    private lateinit var compassImage: ImageView
+    private lateinit var sensorManager: SensorManager
+    private lateinit var accelerometer: Sensor
+    private lateinit var magnetometer: Sensor
+    private var currentDegree = 0f
+
+    private var lastAccelerometer = FloatArray(3)
+    private var lastMagnetometer = FloatArray(3)
+    private var lastAccelerometerSet = false
+    private var lastMagnetometerSet = false
+
+    private var isCompassVisible = false
+
+
     //Create view model
     private val polylineViewModel: PolylineViewModel by lazy {
         PolylineViewModel()
@@ -88,6 +113,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         buttonOptions = findViewById(R.id.buttonOptions)
         textViewTimer = findViewById(R.id.textViewSessionDurtation)
         buttonMainAddCheckpoint = findViewById(R.id.buttonMainAddCheckpoint)
+        buttonCompass = findViewById(R.id.buttonCompass)
 
         textViewTimer.text = timerValue
 
@@ -116,6 +142,18 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         buttonOptions.setOnClickListener {
             SwitchToSettingsActivity()
         }
+
+        //Compass
+        compassImage = findViewById(R.id.imageViewCompass)
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)!!
+        magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)!!
+
+        buttonCompass.setOnClickListener {
+            isCompassVisible = !isCompassVisible
+            updateCompassState()
+        }
+        //====
     }
 
     private fun SwitchToSettingsActivity() {
@@ -228,12 +266,82 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     override fun onResume() {
         super.onResume()
         LocalBroadcastManager.getInstance(this).registerReceiver(innerBroadcastReceiver, innerBroadcastReceiverIntentFilter)
+        if (isCompassVisible) {
+            sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
+            sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_GAME)
+        }
+
     }
 
     override fun onPause() {
         super.onPause()
         LocalBroadcastManager.getInstance(this).unregisterReceiver(innerBroadcastReceiver)
+        if (isCompassVisible) {
+            sensorManager.unregisterListener(this, accelerometer)
+            sensorManager.unregisterListener(this, magnetometer)
+        }
+
     }
+
+    //Compass
+    override fun onSensorChanged(event: SensorEvent) {
+        if (event.sensor === accelerometer) {
+            lowPass(event.values, lastAccelerometer)
+            lastAccelerometerSet = true
+        } else if (event.sensor === magnetometer) {
+            lowPass(event.values, lastMagnetometer)
+            lastMagnetometerSet = true
+        }
+
+        if (lastAccelerometerSet && lastMagnetometerSet) {
+            val r = FloatArray(9)
+            if (SensorManager.getRotationMatrix(r, null, lastAccelerometer, lastMagnetometer)) {
+                val orientation = FloatArray(3)
+                SensorManager.getOrientation(r, orientation)
+                val degree = (toDegrees(orientation[0].toDouble()) + 360).toFloat() % 360
+
+                val rotateAnimation = RotateAnimation(
+                    currentDegree,
+                    -degree,
+                    RELATIVE_TO_SELF, 0.5f,
+                    RELATIVE_TO_SELF, 0.5f
+                )
+                rotateAnimation.duration = 1000
+                rotateAnimation.fillAfter = true
+
+                compassImage.startAnimation(rotateAnimation)
+                currentDegree = -degree
+            }
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+
+    fun lowPass(input: FloatArray, output: FloatArray) {
+        val alpha = 0.05f
+
+        for (i in input.indices) {
+            output[i] = output[i] + alpha * (input[i] - output[i])
+        }
+    }
+
+    private fun updateCompassState() {
+        if (isCompassVisible) {
+            // Register the sensor listener when the compass is enabled
+            sensorManager.registerListener(
+                this, accelerometer, SensorManager.SENSOR_DELAY_GAME
+            )
+            sensorManager.registerListener(
+                this, magnetometer, SensorManager.SENSOR_DELAY_GAME
+            )
+        } else {
+            // Unregister the sensor listener when the compass is disabled
+            sensorManager.unregisterListener(this, accelerometer)
+            sensorManager.unregisterListener(this, magnetometer)
+        }
+    }
+
+    //=========
 
     override fun onMapClick(p0: LatLng) {
         Log.d(TAG, "onMapClick")
@@ -266,6 +374,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             outState.putDouble("userLocationLat", userLocation!!.latitude)
             outState.putDouble("userLocationLon", userLocation!!.longitude)
         }
+
+        outState.putBoolean("isCompassVisible", isCompassVisible)
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
@@ -289,6 +399,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             savedInstanceState.getDouble("userLocationLat"),
             savedInstanceState.getDouble("userLocationLon")
         )
+
+        isCompassVisible = savedInstanceState.getBoolean("isCompassVisible")
     }
 
     fun restorePolyLine(){
@@ -362,7 +474,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         mMap.isMyLocationEnabled = true;
         // add user directional indicatior
         if (userLocation != null && userHeading != null) {
-            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation!!, 18f))
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation!!, 15f))
         }
 
         // Restore polyline from saved instance state
