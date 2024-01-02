@@ -33,7 +33,7 @@
             android:text="CP"
             app:autoSizeTextType="uniform"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/textViewDistanceToCP"
+            app:layout_constraintEnd_toStartOf="@+id/textViewDistanceFromCP"
             app:layout_constraintStart_toEndOf="@+id/guideline5"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintVertical_bias="0.498" />
@@ -64,7 +64,7 @@
             app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
-            android:id="@+id/textViewAverageSpeed"
+            android:id="@+id/textViewOverallSpeed"
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:text="AVG spd"
@@ -80,35 +80,35 @@
             android:layout_height="0dp"
             android:text="Duration"
             app:autoSizeTextType="uniform"
-            app:layout_constraintBottom_toTopOf="@+id/textViewAverageSpeed"
+            app:layout_constraintBottom_toTopOf="@+id/textViewOverallSpeed"
             app:layout_constraintEnd_toStartOf="@+id/guideline5"
             app:layout_constraintStart_toEndOf="@+id/buttonMainStartStopService"
             app:layout_constraintTop_toBottomOf="@+id/textViewOverallDistance" />
 
         <TextView
-            android:id="@+id/textViewDistanceToCP"
+            android:id="@+id/textViewDistanceFromCP"
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:text="Distance CP to current"
             app:autoSizeTextType="uniform"
-            app:layout_constraintBottom_toTopOf="@+id/textViewDistanceToCPLine"
+            app:layout_constraintBottom_toTopOf="@+id/textViewDistanceToLastCPLine"
             app:layout_constraintEnd_toStartOf="@+id/guideline6"
             app:layout_constraintStart_toEndOf="@+id/buttonMainAddCheckpoint"
             app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
-            android:id="@+id/textViewDistanceToCPLine"
+            android:id="@+id/textViewDistanceToLastCPLine"
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:text="Distance CP to current (line)"
             app:autoSizeTextType="uniform"
-            app:layout_constraintBottom_toTopOf="@+id/textViewAverageSpeedCP"
+            app:layout_constraintBottom_toTopOf="@+id/textViewAverageSpeedFromLastCP"
             app:layout_constraintEnd_toStartOf="@+id/guideline6"
             app:layout_constraintStart_toEndOf="@+id/buttonMainAddCheckpoint"
-            app:layout_constraintTop_toBottomOf="@+id/textViewDistanceToCP" />
+            app:layout_constraintTop_toBottomOf="@+id/textViewDistanceFromCP" />
 
         <TextView
-            android:id="@+id/textViewAverageSpeedCP"
+            android:id="@+id/textViewAverageSpeedFromLastCP"
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:text="AVG spd"
@@ -116,7 +116,7 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@+id/guideline6"
             app:layout_constraintStart_toEndOf="@+id/buttonMainAddCheckpoint"
-            app:layout_constraintTop_toBottomOf="@+id/textViewDistanceToCPLine" />
+            app:layout_constraintTop_toBottomOf="@+id/textViewDistanceToLastCPLine" />
 
         <Button
             android:id="@+id/buttonMainAddWP"

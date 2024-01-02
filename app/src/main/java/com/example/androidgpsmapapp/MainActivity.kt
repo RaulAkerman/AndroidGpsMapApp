@@ -59,7 +59,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private lateinit var textViewMainLon: TextView
     private lateinit var mMap: GoogleMap
     private lateinit var buttonOptions: Button
-    private lateinit var textViewTimer: TextView
     private lateinit var buttonCompass: Button
 
     private val innerBroadcastReceiver = InnerBroadcastReceiver()
@@ -73,9 +72,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private var userAccuracy: Float? = null
     private var userAltitude: Double? = null
     private var userVerticalAccuracy: Float? = null
-    private var userDirectionalIndicator: Marker? = null
-
-    private var timerValue = "0"
 
     private val polyLineOptions = PolylineOptions().width(10f)
     private var polyline : Polyline? = null
@@ -95,12 +91,35 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private var lastMagnetometerSet = false
 
     private var isCompassVisible = false
+    //====
 
+    //Bottom info
+    private var timerValue = "00:00:00"
+    private var timerValueInSecond = 0
+    private var timerValueAtLastCP = 0
+    private var timerValueAtLastWP = 0
+    private var waypointStartPosition: LatLng? = null
+
+    private lateinit var textViewTimer: TextView
+    private lateinit var textViewOverallDistance: TextView
+    private lateinit var textViewOverallSpeed: TextView
+    private lateinit var textViewCheckpointDistance: TextView
+    private lateinit var textViewCheckpointDistanceDirect: TextView
+    private lateinit var textViewCheckpointSpeed: TextView
+    private lateinit var textViewWaypointDistanceDirect: TextView
+    private lateinit var textViewWaypointDistance: TextView //Distance travelled since placing wp
+    private lateinit var textViewWaypointSpeed: TextView //Speed since placing wp
 
     //Create view model
     private val polylineViewModel: PolylineViewModel by lazy {
         PolylineViewModel()
     }
+
+    //SharedPrefs
+    private val TIMER_VALUE_KEY = "timerValueInSecond"
+    private val TIMER_AT_LAST_CP_KEY = "timerValueAtLastCP"
+    private val TIMER_AT_LAST_WP_KEY = "timerValueAtLastWP"
+    private val WAYPOINT_START_POSITION_KEY = "waypointStartPosition"
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -111,11 +130,30 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         textViewMainLat = findViewById(R.id.textViewMainLat)
         textViewMainLon = findViewById(R.id.textViewMainLon)
         buttonOptions = findViewById(R.id.buttonOptions)
-        textViewTimer = findViewById(R.id.textViewSessionDurtation)
         buttonMainAddCheckpoint = findViewById(R.id.buttonMainAddCheckpoint)
         buttonCompass = findViewById(R.id.buttonCompass)
 
+        //Bottom info
+        textViewOverallDistance = findViewById(R.id.textViewOverallDistance)
+        textViewTimer = findViewById(R.id.textViewSessionDurtation)
+        textViewOverallSpeed = findViewById(R.id.textViewOverallSpeed)
+        textViewCheckpointDistance = findViewById(R.id.textViewDistanceFromCP)
+        textViewCheckpointDistanceDirect = findViewById(R.id.textViewDistanceToLastCPLine)
+        textViewCheckpointSpeed = findViewById(R.id.textViewAverageSpeedFromLastCP)
+        textViewWaypointDistance = findViewById(R.id.textViewDistanceToWP)
+        textViewWaypointDistanceDirect = findViewById(R.id.textViewDistanceToWPLine)
+        textViewWaypointSpeed = findViewById(R.id.textViewAverageSpeedWP)
         textViewTimer.text = timerValue
+
+        textViewOverallDistance.text = "0"
+        textViewOverallSpeed.text = "0"
+        textViewCheckpointDistance.text = "0"
+        textViewCheckpointDistanceDirect.text = "0"
+        textViewCheckpointSpeed.text = "0"
+        textViewWaypointDistanceDirect.text = "0"
+        textViewWaypointDistance.text = "0"
+        textViewWaypointSpeed.text = "0"
+        //====
 
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
@@ -136,6 +174,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         buttonMainAddCheckpoint.setOnClickListener {
             if (userLocation != null) {
                 addCheckpoint(userLocation!!)
+                timerValueAtLastCP = timerValueInSecond
             }
         }
 
@@ -229,6 +268,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 .position(waypointLatLng)
                 .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE))
         )
+        waypointStartPosition = userLocation!!
+        timerValueAtLastWP = timerValueInSecond
+
         drawPath()
     }
 
@@ -270,7 +312,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
             sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_GAME)
         }
-
     }
 
     override fun onPause() {
@@ -340,9 +381,116 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             sensorManager.unregisterListener(this, magnetometer)
         }
     }
+    //====
 
-    //=========
+    //Ui updates on pos change
+    private fun updateOverallDistance() {
+        val points = polyline?.points
+        var totalLength = 0.0
 
+        if (points != null) {
+            for (i in 1 until points.size) {
+                val prevLatLng = points[i - 1]
+                val currentLatLng = points[i]
+                totalLength += calculateDistance(prevLatLng, currentLatLng)
+            }
+        }
+
+        val roundedDistance = String.format("%.0f", totalLength)
+        textViewOverallDistance.text = roundedDistance
+        textViewOverallSpeed.text = calculateSpeed(totalLength, timerValueInSecond).toString()
+    }
+
+    fun updateDistanceToLastCheckpoint(){
+        val lastCheckpointIndex = checkpoints.size - 1
+
+
+        // Ensure there is at least one checkpoint
+        if (lastCheckpointIndex >= 0 && userLocation != null) {
+            val lastCheckpoint = checkpoints[lastCheckpointIndex]
+
+            Log.d(TAG, "lasCP: $checkpoints[lastCheckpointIndex]")
+            // Calculate polyline distance
+            val polylineDistance = calculatePolylineDistance(lastCheckpoint, userLocation!!)
+
+            val directDistance = calculateDistance(lastCheckpoint, userLocation!!)
+            // Update the appropriate TextView with the polyline distance
+
+
+            val roundedDistance = String.format("%.0f", polylineDistance)
+            val roundedDistanceDirect = String.format("%.0f", directDistance)
+
+            textViewCheckpointDistance.text = roundedDistance
+            textViewCheckpointDistanceDirect.text = roundedDistanceDirect
+            textViewCheckpointSpeed.text = calculateSpeed(polylineDistance.toDouble(), timerValueInSecond - timerValueAtLastCP).toString()
+        }
+    }
+
+    private fun calculatePolylineDistance(start: LatLng, end: LatLng): Float {
+        var totalDistance = 0f
+        var foundStart = false
+
+        // Ensure the polyline and user location are not null
+        if (polyline != null) {
+            val points = polyline!!.points
+
+            // Iterate through the polyline points
+            for (i in 1 until points.size) {
+                val prevLatLng = points[i - 1]
+                val currentLatLng = points[i]
+
+                // Start accumulating distances when the start point is found
+                if (prevLatLng == start) {
+                    foundStart = true
+                }
+
+                if (foundStart) {
+                    Log.d(TAG, "foundStart")
+                    // Accumulate distances between consecutive polyline points
+                    totalDistance += calculateDistance(prevLatLng, currentLatLng)
+
+                    // Break loop if the currentLatLng is the end point
+                    if (currentLatLng == end) {
+                        break
+                    }
+                }
+            }
+        }
+
+        return totalDistance
+    }
+
+    private fun updateWaypointDistance() {
+        val lastWaypoint = currentWaypoint?.position
+
+        val distanceToWaypoint = lastWaypoint?.let { calculateDistance(userLocation!!, it) } ?: 0f
+        val polylineDistanceFromWpPlacement = waypointStartPosition?.let { calculatePolylineDistance(it, userLocation!!) }
+
+        val roundedDistance = String.format("%.0f", polylineDistanceFromWpPlacement)
+        val roundedDistanceDirect = String.format("%.0f", distanceToWaypoint)
+
+        textViewWaypointDistance.text = roundedDistance
+        textViewWaypointDistanceDirect.text = roundedDistanceDirect
+        if (polylineDistanceFromWpPlacement != null) {
+            textViewWaypointSpeed.text = calculateSpeed(polylineDistanceFromWpPlacement.toDouble(), timerValueInSecond - timerValueAtLastWP).toString()
+        }
+    }
+
+    fun convertDistanceToKilometers(distanceInMeters: Double): Double {
+        return distanceInMeters / 1000
+    }
+
+    fun convertTimeToMinutes(timeInSeconds: Int): Float {
+        return timeInSeconds / 60f
+    }
+
+    fun calculateSpeed(distanceInMeters: Double, timeInSeconds: Int): Double {
+        val distanceInKilometers = convertDistanceToKilometers(distanceInMeters)
+        val timeInMinutes = convertTimeToMinutes(timeInSeconds)
+
+        return String.format("%.3f", distanceInKilometers / timeInMinutes).toDouble()
+    }
+    //====
     override fun onMapClick(p0: LatLng) {
         Log.d(TAG, "onMapClick")
         addWaypoint(p0)
@@ -367,6 +515,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 C.SAVED_WAYPOINTS, polylineViewModel.waypoints as ArrayList<LatLng>
             )
         }
+
+        outState.putString("overallDistance", textViewOverallDistance.text.toString())
+        outState.putString("overallSpeed", textViewOverallSpeed.text.toString())
+        outState.putString("checkpointDistance", textViewCheckpointDistance.text.toString())
+        outState.putString("checkpointDistanceDirect", textViewCheckpointDistanceDirect.text.toString())
+        outState.putString("checkpointSpeed", textViewCheckpointSpeed.text.toString())
+        outState.putString("waypointDistanceDirect", textViewWaypointDistanceDirect.text.toString())
+        outState.putString("waypointDistance", textViewWaypointDistance.text.toString())
+        outState.putString("waypointSpeed", textViewWaypointSpeed.text.toString())
+
         //Save buttonMainStartStopService text
         outState.putString("buttonMainStartStopServiceText", buttonMainStartStopService.text.toString())
         //Save user location
@@ -376,6 +534,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         }
 
         outState.putBoolean("isCompassVisible", isCompassVisible)
+
+        val sharedPref = this.getPreferences(Context.MODE_PRIVATE)
+        val editor = sharedPref.edit()
+
+        editor.putInt(TIMER_VALUE_KEY, timerValueInSecond)
+        editor.putInt(TIMER_AT_LAST_CP_KEY, timerValueAtLastCP)
+        editor.putInt(TIMER_AT_LAST_WP_KEY, timerValueAtLastWP)
+
+        if (waypointStartPosition != null) {
+            editor.putFloat(WAYPOINT_START_POSITION_KEY + "_lat", waypointStartPosition!!.latitude.toFloat())
+            editor.putFloat(WAYPOINT_START_POSITION_KEY + "_lon", waypointStartPosition!!.longitude.toFloat())
+        }
+
+        editor.apply()
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
@@ -522,12 +694,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
         val latLng = LatLng(lat, lon)
         Log.d(TAG, "Speed: $userSpeed")
-        polyLineOptions.add(latLng).color(polylineColor())
 
+        polyLineOptions.add(latLng).color(polylineColor())
         polyline = mMap.addPolyline(polyLineOptions)
 
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation!!, 18f))
 
+        updateOverallDistance()
+        updateDistanceToLastCheckpoint()
+        updateWaypointDistance()
     }
 
     private fun resetUiState() {
@@ -537,7 +712,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         timerValue = "00:00:00"
         textViewTimer.text = timerValue
     }
-
 
     private inner class InnerBroadcastReceiver: BroadcastReceiver(){
         override fun onReceive(context: Context?, broadcastIntent: Intent?) {
@@ -567,10 +741,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 }
                 C.ACTION_TIMER -> {
                     val payloadTime = broadcastIntent.getStringExtra(C.PAYLOAD_TIME)
-                    Log.d(TAG, "Payload Time: $payloadTime")
-
                     val seconds = payloadTime?.toIntOrNull() ?: 0
                     val formattedTime = formatTime(seconds)
+                    timerValueInSecond = seconds
                     timerValue = formattedTime
                     textViewTimer.text = formattedTime
                 }
