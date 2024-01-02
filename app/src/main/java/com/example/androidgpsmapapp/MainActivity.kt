@@ -564,6 +564,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                         broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0)
                     )
                     addCheckpoint(checkpointLatLng)
+                    val returnIntent = Intent(C.ACTION_STOP_CHECKPOINT_BROADCAST)
+                    //Add checkpoint to return intent
+                    returnIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, checkpointLatLng.latitude)
+                    returnIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, checkpointLatLng.longitude)
+                    LocalBroadcastManager.getInstance(this@MainActivity).sendBroadcast(returnIntent)
                 }
                 C.ACTION_TIMER -> {
                     val payloadTime = broadcastIntent.getStringExtra(C.PAYLOAD_TIME)

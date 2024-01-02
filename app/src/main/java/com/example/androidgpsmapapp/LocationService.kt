@@ -4,10 +4,13 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.location.Location
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
@@ -27,6 +30,11 @@ class LocationService : Service() {
         const val ACTION_ADD_CHECKPOINT_BROADCAST = "com.example.androidgpsmapapp.ADD_CHECKPOINT_BROADCAST"
     }
 
+    private var isSendingCheckpoint = false
+    private val innerBroadcastReceiver = InnerBroadcastReceiver()
+    private val innerBroadcastReceiverIntentFilter = IntentFilter()
+    private val checkpoints = mutableListOf<Location>()
+
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationRequest: LocationRequest
     private lateinit var locationCallBack: LocationCallback
@@ -37,7 +45,11 @@ class LocationService : Service() {
         // call within 5 seconds from start
         showNotification()
         Log.d(TAG, "onStartCommand")
+        innerBroadcastReceiverIntentFilter.addAction(C.ACTION_STOP_CHECKPOINT_BROADCAST)
+        LocalBroadcastManager.getInstance(this).registerReceiver(innerBroadcastReceiver, innerBroadcastReceiverIntentFilter)
         if (intent?.action == ACTION_ADD_CHECKPOINT_BROADCAST) {
+            checkpoints.add(prevLocation!!)
+            isSendingCheckpoint = true
             sendAddCheckpointBroadcast()
         }
 
@@ -88,12 +100,43 @@ class LocationService : Service() {
     }
 
     private fun sendAddCheckpointBroadcast() {
+        val handler = Handler()
+        val delayMillis = 5000 // Set your desired delay time in milliseconds
         Log.d(TAG, "sendAddCheckpointBroadcast")
-        val broadcastIntent = Intent(C.ACTION_PLACE_CHECKPOINT)
-        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, prevLocation?.latitude)
-        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, prevLocation?.longitude)
-        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+        handler.postDelayed(object : Runnable {
+            override fun run() {
+//                Log.d(TAG, "sendAddCheckpointBroadcast")
+//                val broadcastIntent = Intent(C.ACTION_PLACE_CHECKPOINT)
+//                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, prevLocation?.latitude)
+//                broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, prevLocation?.longitude)
+//                LocalBroadcastManager.getInstance(this@LocationService).sendBroadcast(broadcastIntent)
+
+                //Send broadcast for every location saved in the list
+                for (checkpoint in checkpoints) {
+                    val broadcastIntent = Intent(C.ACTION_PLACE_CHECKPOINT)
+                    broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, checkpoint.latitude)
+                    broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, checkpoint.longitude)
+                    LocalBroadcastManager.getInstance(this@LocationService).sendBroadcast(broadcastIntent)
+                }
+
+                // Check for the condition to stop sending broadcasts
+                if (checkpoints.size == 0) {
+                    Log.d(TAG, "stopAddCheckpointBroadcast")
+                    handler.removeCallbacks(this)
+                } else {
+                    handler.postDelayed(this, delayMillis.toLong())
+                }
+            }
+        }, delayMillis.toLong())
     }
+
+//    private fun sendAddCheckpointBroadcast() {
+//        Log.d(TAG, "sendAddCheckpointBroadcast")
+//        val broadcastIntent = Intent(C.ACTION_PLACE_CHECKPOINT)
+//        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, prevLocation?.latitude)
+//        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, prevLocation?.longitude)
+//        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+//    }
 
     override fun onCreate() {
         super.onCreate()
@@ -175,9 +218,26 @@ class LocationService : Service() {
         LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
     }
 
+    private inner class InnerBroadcastReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == C.ACTION_STOP_CHECKPOINT_BROADCAST) {
+                //Find checkpoint in the list and remove it
+                val lat = intent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0)
+                val lon = intent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0)
+                for (checkpoint in checkpoints) {
+                    if (checkpoint.latitude == lat && checkpoint.longitude == lon) {
+                        checkpoints.remove(checkpoint)
+                        break
+                    }
+                }
+            }
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         fusedLocationClient.removeLocationUpdates(locationCallBack)
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(innerBroadcastReceiver)
     }
 
     override fun onBind(intent: Intent): IBinder? {
