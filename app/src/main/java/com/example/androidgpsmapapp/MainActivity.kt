@@ -59,6 +59,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private lateinit var mMap: GoogleMap
     private lateinit var buttonOptions: Button
     private lateinit var buttonCompass: Button
+    private lateinit var buttonCenter: Button
+    private lateinit var buttonNorthUp: Button
+    private lateinit var buttonSetRotation: Button
 
     private val innerBroadcastReceiver = InnerBroadcastReceiver()
     private val innerBroadcastReceiverIntentFilter = IntentFilter()
@@ -114,11 +117,24 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         PolylineViewModel()
     }
 
+    //Toggles
+    private var keepCentered = true
+    private var isNorthUp = false
+    private var useSavedRotation = false
+
+    private var savedRotation: Float = 0f
+
+
     //SharedPrefs
     private val TIMER_VALUE_KEY = "timerValueInSecond"
     private val TIMER_AT_LAST_CP_KEY = "timerValueAtLastCP"
     private val TIMER_AT_LAST_WP_KEY = "timerValueAtLastWP"
     private val WAYPOINT_START_POSITION_KEY = "waypointStartPosition"
+    private val KEEP_CENTERED = "keepCentered"
+    private val NORTH_UP = "northUp"
+    private val SAVED_ROTATION = "savedRotation"
+    private val USE_SAVED_ROTATION = "useSavedRotation"
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -131,6 +147,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         buttonOptions = findViewById(R.id.buttonOptions)
         buttonMainAddCheckpoint = findViewById(R.id.buttonMainAddCheckpoint)
         buttonCompass = findViewById(R.id.buttonCompass)
+        buttonCenter = findViewById(R.id.buttonCenter)
+        buttonNorthUp = findViewById(R.id.buttonNorthUp)
+        buttonSetRotation = findViewById(R.id.buttonSetRotation)
 
         //Bottom info
         textViewOverallDistance = findViewById(R.id.textViewOverallDistance)
@@ -179,6 +198,26 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
         buttonOptions.setOnClickListener {
             SwitchToSettingsActivity()
+        }
+
+        buttonCenter.setOnClickListener {
+            keepCentered = !keepCentered
+        }
+
+        buttonNorthUp.setOnClickListener {
+            isNorthUp = !isNorthUp
+        }
+
+        buttonSetRotation.setOnClickListener {
+            if (userLocation != null) {
+                if (savedRotation != 0f) {
+                    savedRotation = 0f
+                    useSavedRotation = false
+                } else {
+                    savedRotation = userHeading!!
+                    useSavedRotation = true
+                }
+            }
         }
 
         //Compass
@@ -536,6 +575,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         editor.putInt(TIMER_VALUE_KEY, timerValueInSecond)
         editor.putInt(TIMER_AT_LAST_CP_KEY, timerValueAtLastCP)
         editor.putInt(TIMER_AT_LAST_WP_KEY, timerValueAtLastWP)
+        editor.putBoolean(KEEP_CENTERED, keepCentered)
+        editor.putBoolean(NORTH_UP, isNorthUp)
+        editor.putBoolean(USE_SAVED_ROTATION, useSavedRotation)
+        editor.putFloat(SAVED_ROTATION, savedRotation)
 
         if (waypointStartPosition != null) {
             editor.putFloat(WAYPOINT_START_POSITION_KEY + "_lat", waypointStartPosition!!.latitude.toFloat())
@@ -583,6 +626,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         timerValueInSecond = sharedPref.getInt(TIMER_VALUE_KEY, 0)
         timerValueAtLastCP = sharedPref.getInt(TIMER_AT_LAST_CP_KEY, 0)
         timerValueAtLastWP = sharedPref.getInt(TIMER_AT_LAST_WP_KEY, 0)
+        keepCentered = sharedPref.getBoolean(KEEP_CENTERED, true)
+        isNorthUp = sharedPref.getBoolean(NORTH_UP, false)
+        useSavedRotation = sharedPref.getBoolean(USE_SAVED_ROTATION, false)
+        savedRotation = sharedPref.getFloat(SAVED_ROTATION, 0f)
 
         val retrievedWaypointLat = sharedPref.getFloat(WAYPOINT_START_POSITION_KEY + "_lat", 0f)
         val retrievedWaypointLon = sharedPref.getFloat(WAYPOINT_START_POSITION_KEY + "_lon", 0f)
@@ -642,7 +689,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         mMap.setOnMapClickListener { latLng ->
             addWaypoint(latLng)
             drawPath()
-//            updateMapOrientation()
         }
 
         if (ActivityCompat.checkSelfPermission(
@@ -675,37 +721,27 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     private fun updateMapOrientation() {
-        val isNorthUpEnabled = true
-        if (isNorthUpEnabled) {
-            // If "keep north-up" is enabled, set the map orientation to the user's bearing
-            if (ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACCESS_FINE_LOCATION
-                ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                // TODO: Consider calling
-                //    ActivityCompat#requestPermissions
-                // here to request the missing permissions, and then overriding
-                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                //                                          int[] grantResults)
-                // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
-                return
+        if (::mMap.isInitialized && userLocation != null) {
+            val builder = CameraPosition.Builder()
+
+            // Assuming you have initialized isNorthUp, useSavedRotation, and userHeading
+
+            userLocation?.let {
+                builder.target(it)
             }
-            mMap.isMyLocationEnabled = true
-            val userBearing = mMap.myLocation.bearing ?: 0f
-            mMap.animateCamera(
-                CameraUpdateFactory.newCameraPosition(
-                    CameraPosition.Builder(mMap.cameraPosition).bearing(userBearing).build()
-                )
-            )
-        } else {
-            // If "keep north-up" is disabled, reset the map orientation to default
-            mMap.isMyLocationEnabled = true // You can set it to false if you don't want to show the location dot
-            mMap.animateCamera(CameraUpdateFactory.newLatLng(mMap.cameraPosition.target))
+
+            builder.zoom(18f)
+            builder.tilt(0f)
+
+            when {
+                isNorthUp -> builder.bearing(0f)
+                useSavedRotation -> builder.bearing(savedRotation)
+                else -> userHeading?.let { builder.bearing(it) }
+            }
+
+            val cameraPosition = builder.build()
+
+            mMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition))
         }
     }
 
@@ -718,7 +754,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         polyLineOptions.add(latLng).color(polylineColor())
         polyline = mMap.addPolyline(polyLineOptions)
 
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation!!, 18f))
+        if (keepCentered) {
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation!!, 18f))
+            updateMapOrientation()
+        }
 
         updateOverallDistance()
         updateDistanceToLastCheckpoint()
