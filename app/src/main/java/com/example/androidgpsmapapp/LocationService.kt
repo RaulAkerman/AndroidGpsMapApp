@@ -41,6 +41,10 @@ class LocationService : Service() {
 
     private var prevLocation: Location? = null
 
+    private var totalDistance = 0.0
+    private var timerValue: Int = 0
+    private val timeUpdateReceiver = TimeUpdateReceiver()
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // call within 5 seconds from start
         showNotification()
@@ -53,14 +57,17 @@ class LocationService : Service() {
             sendAddCheckpointBroadcast()
         }
 
+        innerBroadcastReceiverIntentFilter.addAction(C.ACTION_TIMER)
+        LocalBroadcastManager.getInstance(this).registerReceiver(timeUpdateReceiver, innerBroadcastReceiverIntentFilter)
+
         return START_STICKY
     }
 
     private fun showNotification() {
         val view = RemoteViews(packageName, R.layout.location_notif)
 
-        view.setTextViewText(R.id.textViewLat, prevLocation?.latitude.toString())
-        view.setTextViewText(R.id.textViewLon, prevLocation?.longitude.toString())
+        view.setTextViewText(R.id.textViewLat, "Time spent: ${formatTime(timerValue)}")
+        view.setTextViewText(R.id.textViewLon, "Distance: ${"%.2f".format(totalDistance)}m")
 
         // Create an intent for the button click event
         val buttonIntent = Intent(this, LocationService::class.java)
@@ -97,6 +104,13 @@ class LocationService : Service() {
         }
 
         startForeground(1, builder.build())
+    }
+
+    private fun formatTime(seconds: Int): String {
+        val hours = seconds / 3600
+        val minutes = (seconds % 3600) / 60
+        val remainingSeconds = seconds % 60
+        return String.format("%02d:%02d:%02d", hours, minutes, remainingSeconds)
     }
 
     private fun sendAddCheckpointBroadcast() {
@@ -194,6 +208,7 @@ class LocationService : Service() {
             val distance = prevLocation!!.distanceTo(location)
 
             if (distance in 1.0..500.0) {
+                totalDistance += distance
                 prevLocation = location
                 showNotification()
                 sendLocationUpdateBroadcast(location)
@@ -243,4 +258,22 @@ class LocationService : Service() {
     override fun onBind(intent: Intent): IBinder? {
         return null
     }
+
+    private fun updateTimerVariable(seconds: Int) {
+        timerValue = seconds
+    }
+
+    private inner class TimeUpdateReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context?, broadcastIntent: Intent?) {
+            when (broadcastIntent!!.action) {
+                C.ACTION_TIMER -> {
+                    val payloadTime = broadcastIntent.getStringExtra(C.PAYLOAD_TIME)
+                    val seconds = payloadTime?.toIntOrNull() ?: 0
+                    // Handle the time update as needed
+                    updateTimerVariable(seconds)
+                }
+            }
+        }
+    }
+
 }

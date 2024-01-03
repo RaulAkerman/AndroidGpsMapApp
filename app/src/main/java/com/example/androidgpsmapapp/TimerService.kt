@@ -37,7 +37,6 @@ class TimerService : Service() {
                 seconds++
                 intent.putExtra(C.PAYLOAD_TIME, "$seconds")
                 val timeValue = intent.getStringExtra(C.PAYLOAD_TIME)
-                Log.d(TAG, "Value sent in putExtra field: $timeValue")
                 LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(intent)
             },
             0,
