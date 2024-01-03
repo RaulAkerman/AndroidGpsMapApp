@@ -572,7 +572,32 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             savedInstanceState.getDouble("userLocationLon")
         )
 
+        textViewOverallDistance.text = savedInstanceState.getString("overallDistance", "")
+        textViewOverallSpeed.text = savedInstanceState.getString("overallSpeed", "")
+        textViewCheckpointDistance.text = savedInstanceState.getString("checkpointDistance", "")
+        textViewCheckpointDistanceDirect.text = savedInstanceState.getString("checkpointDistanceDirect", "")
+        textViewCheckpointSpeed.text = savedInstanceState.getString("checkpointSpeed", "")
+        textViewWaypointDistanceDirect.text = savedInstanceState.getString("waypointDistanceDirect", "")
+        textViewWaypointDistance.text = savedInstanceState.getString("waypointDistance", "")
+        textViewWaypointSpeed.text = savedInstanceState.getString("waypointSpeed", "")
+
         isCompassVisible = savedInstanceState.getBoolean("isCompassVisible")
+
+        val sharedPref = this.getPreferences(Context.MODE_PRIVATE)
+
+        timerValueInSecond = sharedPref.getInt(TIMER_VALUE_KEY, 0)
+        timerValueAtLastCP = sharedPref.getInt(TIMER_AT_LAST_CP_KEY, 0)
+        timerValueAtLastWP = sharedPref.getInt(TIMER_AT_LAST_WP_KEY, 0)
+
+        val retrievedWaypointLat = sharedPref.getFloat(WAYPOINT_START_POSITION_KEY + "_lat", 0f)
+        val retrievedWaypointLon = sharedPref.getFloat(WAYPOINT_START_POSITION_KEY + "_lon", 0f)
+
+        waypointStartPosition =
+            if (retrievedWaypointLat != 0f && retrievedWaypointLon != 0f) {
+                LatLng(retrievedWaypointLat.toDouble(), retrievedWaypointLon.toDouble())
+            } else {
+                null
+            }
     }
 
     fun restorePolyLine(){
