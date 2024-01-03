@@ -41,7 +41,6 @@ import com.google.android.gms.maps.model.Polyline
 import com.google.android.gms.maps.model.PolylineOptions
 import org.json.JSONObject
 import android.hardware.SensorEventListener
-import android.view.animation.Animation
 import android.view.animation.Animation.RELATIVE_TO_SELF
 import android.view.animation.RotateAnimation
 import java.lang.Math.toDegrees
@@ -268,7 +267,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 .position(waypointLatLng)
                 .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE))
         )
-        waypointStartPosition = userLocation!!
+        if (userLocation != null) {
+            waypointStartPosition = userLocation
+        }
+
         timerValueAtLastWP = timerValueInSecond
 
         drawPath()
@@ -398,7 +400,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
         val roundedDistance = String.format("%.0f", totalLength)
         textViewOverallDistance.text = roundedDistance
-        textViewOverallSpeed.text = calculateSpeed(totalLength, timerValueInSecond).toString()
+        textViewOverallSpeed.text = calculateTimeToTravelOneKm(totalLength, timerValueInSecond).toString()
     }
 
     fun updateDistanceToLastCheckpoint(){
@@ -422,7 +424,24 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
             textViewCheckpointDistance.text = roundedDistance
             textViewCheckpointDistanceDirect.text = roundedDistanceDirect
-            textViewCheckpointSpeed.text = calculateSpeed(polylineDistance.toDouble(), timerValueInSecond - timerValueAtLastCP).toString()
+            textViewCheckpointSpeed.text = calculateTimeToTravelOneKm(polylineDistance.toDouble(), timerValueInSecond - timerValueAtLastCP).toString()
+        }
+    }
+
+    private fun updateWaypointDistance() {
+        val lastWaypoint = currentWaypoint?.position
+
+        val distanceToWaypoint = lastWaypoint?.let { calculateDistance(userLocation!!, it) } ?: 0f
+        val polylineDistanceFromWpPlacement = waypointStartPosition?.let { calculatePolylineDistance(it, userLocation!!) }
+
+        val roundedDistance = String.format("%.0f", polylineDistanceFromWpPlacement)
+        val roundedDistanceDirect = String.format("%.0f", distanceToWaypoint)
+
+        textViewWaypointDistance.text = roundedDistance
+        textViewWaypointDistanceDirect.text = roundedDistanceDirect
+
+        if (polylineDistanceFromWpPlacement != null) {
+            textViewWaypointSpeed.text = calculateTimeToTravelOneKm(polylineDistanceFromWpPlacement.toDouble(), timerValueInSecond - timerValueAtLastCP).toString()
         }
     }
 
@@ -460,35 +479,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         return totalDistance
     }
 
-    private fun updateWaypointDistance() {
-        val lastWaypoint = currentWaypoint?.position
+    fun calculateTimeToTravelOneKm(distanceInMeters: Double, timeInSeconds: Int): Double {
+        val speed = distanceInMeters / timeInSeconds
+        val time = (1000 / speed) / 60
 
-        val distanceToWaypoint = lastWaypoint?.let { calculateDistance(userLocation!!, it) } ?: 0f
-        val polylineDistanceFromWpPlacement = waypointStartPosition?.let { calculatePolylineDistance(it, userLocation!!) }
-
-        val roundedDistance = String.format("%.0f", polylineDistanceFromWpPlacement)
-        val roundedDistanceDirect = String.format("%.0f", distanceToWaypoint)
-
-        textViewWaypointDistance.text = roundedDistance
-        textViewWaypointDistanceDirect.text = roundedDistanceDirect
-        if (polylineDistanceFromWpPlacement != null) {
-            textViewWaypointSpeed.text = calculateSpeed(polylineDistanceFromWpPlacement.toDouble(), timerValueInSecond - timerValueAtLastWP).toString()
-        }
-    }
-
-    fun convertDistanceToKilometers(distanceInMeters: Double): Double {
-        return distanceInMeters / 1000
-    }
-
-    fun convertTimeToMinutes(timeInSeconds: Int): Float {
-        return timeInSeconds / 60f
-    }
-
-    fun calculateSpeed(distanceInMeters: Double, timeInSeconds: Int): Double {
-        val distanceInKilometers = convertDistanceToKilometers(distanceInMeters)
-        val timeInMinutes = convertTimeToMinutes(timeInSeconds)
-
-        return String.format("%.3f", distanceInKilometers / timeInMinutes).toDouble()
+        return String.format("%.2f", time).toDouble()
     }
     //====
     override fun onMapClick(p0: LatLng) {
