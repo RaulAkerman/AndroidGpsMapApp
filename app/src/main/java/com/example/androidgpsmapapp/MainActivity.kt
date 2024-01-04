@@ -43,6 +43,8 @@ import org.json.JSONObject
 import android.hardware.SensorEventListener
 import android.view.animation.Animation.RELATIVE_TO_SELF
 import android.view.animation.RotateAnimation
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import java.lang.Math.toDegrees
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapClickListener, SensorEventListener {
@@ -134,6 +136,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private val NORTH_UP = "northUp"
     private val SAVED_ROTATION = "savedRotation"
     private val USE_SAVED_ROTATION = "useSavedRotation"
+    private val POSITION_WITH_TIMESTAMP = "positionWithTimestamp"
+
+    data class LatLngTime(val position: LatLng, val timestamp: Long)
+    private var latLngTime: MutableList<LatLngTime> = mutableListOf()
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -569,8 +575,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
         outState.putBoolean("isCompassVisible", isCompassVisible)
 
-        val sharedPref = this.getPreferences(Context.MODE_PRIVATE)
+        val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
         val editor = sharedPref.edit()
+
+        val gson = Gson()
+        val json = gson.toJson(latLngTime)
 
         editor.putInt(TIMER_VALUE_KEY, timerValueInSecond)
         editor.putInt(TIMER_AT_LAST_CP_KEY, timerValueAtLastCP)
@@ -579,6 +588,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         editor.putBoolean(NORTH_UP, isNorthUp)
         editor.putBoolean(USE_SAVED_ROTATION, useSavedRotation)
         editor.putFloat(SAVED_ROTATION, savedRotation)
+        editor.putString(POSITION_WITH_TIMESTAMP, json)
 
         if (waypointStartPosition != null) {
             editor.putFloat(WAYPOINT_START_POSITION_KEY + "_lat", waypointStartPosition!!.latitude.toFloat())
@@ -589,6 +599,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        val gson = Gson()
         Log.d(TAG, "onRestoreInstanceState")
         super.onRestoreInstanceState(savedInstanceState)
         //Restore polyline from view model
@@ -621,7 +632,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
         isCompassVisible = savedInstanceState.getBoolean("isCompassVisible")
 
-        val sharedPref = this.getPreferences(Context.MODE_PRIVATE)
+        val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
 
         timerValueInSecond = sharedPref.getInt(TIMER_VALUE_KEY, 0)
         timerValueAtLastCP = sharedPref.getInt(TIMER_AT_LAST_CP_KEY, 0)
@@ -633,6 +644,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
         val retrievedWaypointLat = sharedPref.getFloat(WAYPOINT_START_POSITION_KEY + "_lat", 0f)
         val retrievedWaypointLon = sharedPref.getFloat(WAYPOINT_START_POSITION_KEY + "_lon", 0f)
+        val jsonFromPrefs = sharedPref.getString(POSITION_WITH_TIMESTAMP, "")
+
+        if (jsonFromPrefs!!.isNotEmpty()) {
+            val type = object : TypeToken<MutableList<LatLngTime>>() {}.type
+            latLngTime = gson.fromJson(jsonFromPrefs, type)
+        }
 
         waypointStartPosition =
             if (retrievedWaypointLat != 0f && retrievedWaypointLon != 0f) {
@@ -645,8 +662,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     fun restorePolyLine(){
         Log.d(TAG, "onRestoreLine")
         polylineViewModel.polylinePoints?.let {
+            polyLineOptions.color(Color.TRANSPARENT)
             polyLineOptions.addAll(it)
             polyline = mMap.addPolyline(polyLineOptions)
+
+            drawPathWithSpeedColors(mMap, latLngTime)
         }
     }
 
@@ -745,14 +765,19 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         }
     }
 
-    private fun updateLocation(lat: Double, lon: Double){
+    private fun updateLocation(lat: Double, lon: Double, timestamp: Long){
         polyline?.remove()
 
         val latLng = LatLng(lat, lon)
-        Log.d(TAG, "Speed: $userSpeed")
+        val newPositionWithTime = LatLngTime(LatLng(lat, lon), timestamp)
+        latLngTime.add(newPositionWithTime)
 
-        polyLineOptions.add(latLng).color(polylineColor())
+        Log.d(TAG, "Lat: $userSpeed Lng: $lon Timestamp: $timestamp")
+
+        polyLineOptions.add(latLng).color(Color.TRANSPARENT)
         polyline = mMap.addPolyline(polyLineOptions)
+
+        drawPathWithSpeedColors(mMap, latLngTime)
 
         if (keepCentered) {
             mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation!!, 18f))
@@ -762,6 +787,45 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         updateOverallDistance()
         updateDistanceToLastCheckpoint()
         updateWaypointDistance()
+    }
+
+    private fun drawPathWithSpeedColors(googleMap: GoogleMap, points: List<LatLngTime>) {
+        if (points.size < 2) {
+            // Path requires at least two points
+            return
+        }
+
+        for (i in 0 until points.size - 1) {
+            val startPoint = points[i]
+            val endPoint = points[i + 1]
+
+            val speed = calculateSpeed(startPoint, endPoint)
+
+            val polylineOptions = PolylineOptions()
+                .add(startPoint.position, endPoint.position)
+                .color(getColorForSpeed(speed))
+                .width(10f) // Set your desired polyline width here
+
+            googleMap.addPolyline(polylineOptions)
+        }
+    }
+
+    private fun getColorForSpeed(speed: Double): Int {
+        // Define your speed thresholds and corresponding colors
+        val slowSpeedThreshold = 5.0 // Example threshold for slow speed
+        val moderateSpeedThreshold = 15.0 // Example threshold for moderate speed
+
+        return when {
+            speed < slowSpeedThreshold -> Color.GREEN
+            speed < moderateSpeedThreshold -> Color.YELLOW
+            else -> Color.RED
+        }
+    }
+
+    private fun calculateSpeed(startPoint: LatLngTime, endPoint: LatLngTime): Double {
+        val distance = calculateDistance(startPoint.position, endPoint.position)
+        val timeDifference = (endPoint.timestamp - startPoint.timestamp) / 1000.0 // Convert to seconds
+        return if (timeDifference != 0.0) distance / timeDifference else 0.0
     }
 
     private fun resetUiState() {
@@ -787,9 +851,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                     userVerticalAccuracy = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_VERTICAL_ACCURACY, 0.0f)
                     textViewMainLat.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0).toString()
                     textViewMainLon.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0).toString()
-                    updateLocation(broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0), broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0))
-                    Log.d(TAG, "ACTION_LOCATION_UPDATE")
-                    Log.d(TAG, "userLocation: $userLocation")
+                    updateLocation(broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0), broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0), broadcastIntent.getLongExtra(C.DATA_LOCATION_UPDATE_TIMESTAMP, 0L))
+
                     drawPath()
 
                     val returnIntent = Intent(C.ACTION_REMOVE_LOCATION_UPDATE)
@@ -863,7 +926,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             Request.Method.POST,
             url,
             Response.Listener { response -> Log.d("Response.Listener", response);
-                val sharedPref = this.getPreferences(Context.MODE_PRIVATE) ?: return@Listener
+                val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
                 with (sharedPref.edit()) {
                     putString("token", JSONObject(response).getString("token"))
                     apply()
@@ -899,7 +962,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             Request.Method.POST,
             url,
             Response.Listener { response -> Log.d("Response.Listener", response);
-                val sharedPref = this.getPreferences(Context.MODE_PRIVATE) ?: return@Listener
+                val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
                 with (sharedPref.edit()) {
                     putString("token", JSONObject(response).getString("token"))
                     apply()
@@ -931,7 +994,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             Request.Method.POST,
             url,
             Response.Listener { response -> Log.d("Response.Listener", response);
-                val sharedPref = this.getPreferences(Context.MODE_PRIVATE) ?: return@Listener
+                val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
                 with (sharedPref.edit()) {
                     putString("session_id", JSONObject(response).getString("id"))
                     apply()
@@ -974,7 +1037,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             Request.Method.GET,
             url,
             Response.Listener { response -> Log.d("Response.Listener", response);
-                val sharedPref = this.getPreferences(Context.MODE_PRIVATE) ?: return@Listener
+                val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
                 with (sharedPref.edit()) {
                     putString("gps_location_types", response)
                     apply()
@@ -1002,7 +1065,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             Request.Method.POST,
             url,
             Response.Listener { response -> Log.d("Response.Listener", response);
-                val sharedPref = this.getPreferences(Context.MODE_PRIVATE) ?: return@Listener
+                val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
                 with (sharedPref.edit()) {
                     remove("latest_location_update")
                     putString("latest_location_update", response)
@@ -1022,7 +1085,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             override fun getBody(): ByteArray {
                 val params = HashMap<String, Any?>()
                 //Get shared preferences
-                val savedPreferences = getPreferences(Context.MODE_PRIVATE)
+                val savedPreferences = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
                 val gpsSessionId = savedPreferences.getString("session_id", "")
                 params["recordedAt"] = "2021-11-11T11:11:11.111Z"
                 params["latitude"] = userLocation?.latitude

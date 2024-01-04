@@ -23,6 +23,7 @@ object C {
     const val ACTION_TIMER = PREFIX + "time"
     const val PAYLOAD_TIME = PREFIX + "payload.time"
     const val ACTION_TIMER_SERVICE_DESTROY = PREFIX + "service_destroy"
+    const val DATA_LOCATION_UPDATE_TIMESTAMP = PREFIX + "LOCATION_UPDATE_TIMESTAMP"
 
     const val NOTIFICATION_CHANNEL = "default"
     const val REQUEST_PERMISSIONS_CODE = 1234

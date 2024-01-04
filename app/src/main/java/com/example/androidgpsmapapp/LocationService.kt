@@ -221,7 +221,7 @@ class LocationService : Service() {
         if (prevLocation != null) {
             val distance = prevLocation!!.distanceTo(location)
 
-            if (distance in 1.0..500.0) {
+            if (distance in 1.0..50.0) {
                 totalDistance += distance
                 prevLocation = location
                 showNotification()
@@ -245,6 +245,8 @@ class LocationService : Service() {
         broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_ACCURACY, location.accuracy)
         broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_ALTITUDE, location.altitude)
         broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_VERTICAL_ACCURACY, location.verticalAccuracyMeters)
+        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_TIMESTAMP, location.time)
+
         Log.d(TAG, "sendLocationUpdateBroadcast")
         LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
     }
