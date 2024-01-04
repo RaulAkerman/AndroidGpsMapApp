@@ -141,6 +141,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     data class LatLngTime(val position: LatLng, val timestamp: Long)
     private var latLngTime: MutableList<LatLngTime> = mutableListOf()
 
+    private var minSpeed = 0
+    private var maxSpeed = 0
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -193,6 +196,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
         checkLocationPermissions()
         createNotificationChannel()
+        loadSpeedValues()
 
         //Set on click listener for add checkpoint button
         buttonMainAddCheckpoint.setOnClickListener {
@@ -290,6 +294,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         }
     }
 
+    private fun loadSpeedValues() {
+        val prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+        minSpeed = prefs.getInt("minSpeed", 5)
+        maxSpeed = prefs.getInt("maxSpeed", 10)
+    }
     fun addCheckpoint(checkpointLatLng: LatLng) {
         val checkpointMarker = mMap.addMarker(
             MarkerOptions()
@@ -321,15 +330,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         drawPath()
     }
 
-    fun polylineColor(): Int {
-        return when {
-            userSpeed == null -> Color.BLACK
-            userSpeed!! < 3 -> Color.BLUE
-            userSpeed!! < 5 -> Color.GREEN
-            else -> Color.RED
-        }
-    }
-
     fun drawPath() {
         markerPolyLine?.remove()
 
@@ -353,6 +353,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
     
     override fun onResume() {
+        loadSpeedValues()
         super.onResume()
         LocalBroadcastManager.getInstance(this).registerReceiver(innerBroadcastReceiver, innerBroadcastReceiverIntentFilter)
         if (isCompassVisible) {
@@ -362,6 +363,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     override fun onPause() {
+        loadSpeedValues()
         super.onPause()
         LocalBroadcastManager.getInstance(this).unregisterReceiver(innerBroadcastReceiver)
         if (isCompassVisible) {
@@ -599,6 +601,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        loadSpeedValues()
         val gson = Gson()
         Log.d(TAG, "onRestoreInstanceState")
         super.onRestoreInstanceState(savedInstanceState)
@@ -660,6 +663,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     fun restorePolyLine(){
+        loadSpeedValues()
         Log.d(TAG, "onRestoreLine")
         polylineViewModel.polylinePoints?.let {
             polyLineOptions.color(Color.TRANSPARENT)
@@ -812,8 +816,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
     private fun getColorForSpeed(speed: Double): Int {
         // Define your speed thresholds and corresponding colors
-        val slowSpeedThreshold = 5.0 // Example threshold for slow speed
-        val moderateSpeedThreshold = 15.0 // Example threshold for moderate speed
+        val slowSpeedThreshold = minSpeed // Example threshold for slow speed
+        val moderateSpeedThreshold = maxSpeed // Example threshold for moderate speed
 
         return when {
             speed < slowSpeedThreshold -> Color.GREEN
