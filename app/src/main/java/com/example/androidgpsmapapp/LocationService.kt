@@ -30,7 +30,8 @@ class LocationService : Service() {
         const val ACTION_ADD_CHECKPOINT_BROADCAST = "com.example.androidgpsmapapp.ADD_CHECKPOINT_BROADCAST"
     }
 
-    private var isSendingCheckpoint = false
+    private val locationQueue = mutableListOf<Location>()
+
     private val innerBroadcastReceiver = InnerBroadcastReceiver()
     private val innerBroadcastReceiverIntentFilter = IntentFilter()
     private val checkpoints = mutableListOf<Location>()
@@ -45,15 +46,26 @@ class LocationService : Service() {
     private var timerValue: Int = 0
     private val timeUpdateReceiver = TimeUpdateReceiver()
 
+    private val handler = Handler()
+
+    private val locationQueueProcessor: Runnable = object : Runnable {
+        override fun run() {
+            if (locationQueue.isNotEmpty()) {
+                sendLocationUpdateBroadcast(locationQueue.elementAt(0))
+            }
+            handler.postDelayed(this, 1000)
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // call within 5 seconds from start
         showNotification()
         Log.d(TAG, "onStartCommand")
         innerBroadcastReceiverIntentFilter.addAction(C.ACTION_STOP_CHECKPOINT_BROADCAST)
+        innerBroadcastReceiverIntentFilter.addAction(C.ACTION_REMOVE_LOCATION_UPDATE)
         LocalBroadcastManager.getInstance(this).registerReceiver(innerBroadcastReceiver, innerBroadcastReceiverIntentFilter)
         if (intent?.action == ACTION_ADD_CHECKPOINT_BROADCAST) {
             checkpoints.add(prevLocation!!)
-            isSendingCheckpoint = true
             sendAddCheckpointBroadcast()
         }
 
@@ -114,7 +126,7 @@ class LocationService : Service() {
     }
 
     private fun sendAddCheckpointBroadcast() {
-        val handler = Handler()
+//        val handler = Handler()
         val delayMillis = 5000 // Set your desired delay time in milliseconds
         Log.d(TAG, "sendAddCheckpointBroadcast")
         handler.postDelayed(object : Runnable {
@@ -167,6 +179,8 @@ class LocationService : Service() {
         getLastKnownLocation()
 
         requestLocationUpdates()
+
+        handler.postDelayed(locationQueueProcessor, 5000)
     }
 
     private fun requestLocationUpdates() {
@@ -211,12 +225,14 @@ class LocationService : Service() {
                 totalDistance += distance
                 prevLocation = location
                 showNotification()
-                sendLocationUpdateBroadcast(location)
+                //sendLocationUpdateBroadcast(location)
+                locationQueue.add(location)
             }
         } else {
             prevLocation = location
             showNotification()
-            sendLocationUpdateBroadcast(location)
+            //sendLocationUpdateBroadcast(location)
+            locationQueue.add(location)
         }
     }
 
@@ -246,6 +262,18 @@ class LocationService : Service() {
                     }
                 }
             }
+            if (intent?.action == C.ACTION_REMOVE_LOCATION_UPDATE) {
+                val lat = intent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0)
+                val lon = intent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0)
+                for (location in locationQueue) {
+                    if (location.latitude == lat && location.longitude == lon) {
+                        Log.d(TAG, "Location removed from queue")
+                        locationQueue.remove(location)
+                        break
+                    }
+                }
+            }
+
         }
     }
 

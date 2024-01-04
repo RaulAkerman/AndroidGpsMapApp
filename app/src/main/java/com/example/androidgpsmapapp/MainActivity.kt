@@ -788,7 +788,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                     textViewMainLat.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0).toString()
                     textViewMainLon.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0).toString()
                     updateLocation(broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0), broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0))
+                    Log.d(TAG, "ACTION_LOCATION_UPDATE")
+                    Log.d(TAG, "userLocation: $userLocation")
                     drawPath()
+
+                    val returnIntent = Intent(C.ACTION_REMOVE_LOCATION_UPDATE)
+                    returnIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, userLocation?.latitude)
+                    returnIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, userLocation?.longitude)
+                    LocalBroadcastManager.getInstance(this@MainActivity).sendBroadcast(returnIntent)
                 }
                 C.ACTION_PLACE_CHECKPOINT -> {
                     Log.d(TAG, "ACTION_PLACE_CHECKPOINT")
