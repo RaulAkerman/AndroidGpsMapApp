@@ -46,6 +46,20 @@ import android.view.animation.RotateAnimation
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.lang.Math.toDegrees
+import android.util.Xml
+import org.xmlpull.v1.XmlSerializer
+import java.io.StringWriter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import android.os.Environment
+import android.widget.Toast
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
+
+
+
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapClickListener, SensorEventListener {
     companion object {
@@ -137,9 +151,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private val SAVED_ROTATION = "savedRotation"
     private val USE_SAVED_ROTATION = "useSavedRotation"
     private val POSITION_WITH_TIMESTAMP = "positionWithTimestamp"
+    private val CHECKPOINT_WITH_TIMESTAMP = "checkpointWithTimestamp"
+    private val WAYPOINT_WITH_TIMESTAMP = "waypointWithTimestamp"
 
     data class LatLngTime(val position: LatLng, val timestamp: Long)
     private var latLngTime: MutableList<LatLngTime> = mutableListOf()
+    private var latLngTimeCheckPoints: MutableList<LatLngTime> = mutableListOf()
+    private var latLngTimeWayPoints: MutableList<LatLngTime> = mutableListOf()
 
     private var minSpeed = 0
     private var maxSpeed = 0
@@ -294,6 +312,107 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         }
     }
 
+    private fun convertToGPX(
+        trackPoints: List<LatLngTime>,
+        checkPoints: List<LatLngTime>,
+        wayPoints: List<LatLngTime>
+    ): String {
+        val serializer = Xml.newSerializer()
+        val writer = StringWriter()
+
+        serializer.setOutput(writer)
+        serializer.startDocument("UTF-8", true)
+        serializer.startTag(null, "gpx")
+        serializer.attribute(null, "version", "1.1")
+        serializer.attribute(null, "creator", "YourApp")
+
+        // Track data
+        serializer.startTag(null, "trk")
+        serializer.startTag(null, "name")
+        serializer.text("Track Example")
+        serializer.endTag(null, "name")
+
+        serializer.startTag(null, "trkseg")
+        for (latLngTime in trackPoints) {
+            addTrackPointToGpx(serializer, latLngTime)
+        }
+        serializer.endTag(null, "trkseg")
+        serializer.endTag(null, "trk")
+
+        for (latLngTime in checkPoints) {
+            addWaypointToGpx(serializer, latLngTime, "Checkpoint")
+        }
+
+        for (latLngTime in wayPoints) {
+            addWaypointToGpx(serializer, latLngTime, "Waypoint")
+        }
+
+        serializer.endTag(null, "gpx")
+        serializer.endDocument()
+
+        return writer.toString()
+    }
+
+    private fun addTrackPointToGpx(serializer: XmlSerializer, latLngTime: LatLngTime) {
+        serializer.startTag(null, "trkpt")
+        serializer.attribute(null, "lat", latLngTime.position.latitude.toString())
+        serializer.attribute(null, "lon", latLngTime.position.longitude.toString())
+
+        serializer.startTag(null, "time")
+        serializer.text(convertMillisToGPXTime(latLngTime.timestamp))
+        serializer.endTag(null, "time")
+
+        serializer.endTag(null, "trkpt")
+    }
+
+    private fun addWaypointToGpx(serializer: XmlSerializer, latLngTime: LatLngTime, type: String) {
+        serializer.startTag(null, "wpt")
+        serializer.attribute(null, "lat", latLngTime.position.latitude.toString())
+        serializer.attribute(null, "lon", latLngTime.position.longitude.toString())
+
+        serializer.startTag(null, "name")
+        serializer.text("$type ${latLngTime.timestamp}")
+        serializer.endTag(null, "name")
+
+        serializer.startTag(null, "time")
+        serializer.text(convertMillisToGPXTime(latLngTime.timestamp))
+        serializer.endTag(null, "time")
+
+        serializer.endTag(null, "wpt")
+    }
+
+    private fun convertMillisToGPXTime(timestamp: Long, locale: Locale = Locale.getDefault()): String {
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", locale)
+        return dateFormat.format(Date(timestamp))
+    }
+
+    // Function to save GPX content to a file
+    private fun saveGPXToFile(context: Context, fileName: String, content: String) {
+        try {
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            downloadsDir.mkdirs()
+
+            val file = File(downloadsDir, "$fileName.gpx")
+            val fileOutputStream = FileOutputStream(file)
+            fileOutputStream.write(content.toByteArray())
+            fileOutputStream.close()
+
+            showToast(context, "GPX file saved at ${file.absolutePath}")
+        } catch (e: IOException) {
+            e.printStackTrace()
+            showToast(context, "Error saving GPX file")
+        }
+    }
+
+    private fun showToast(context: Context, message: String) {
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun generateAndSaveGPX(context: Context, fileName: String, trackPoints: List<LatLngTime>, checkPoints: List<LatLngTime>, wayPoints: List<LatLngTime>) {
+        val gpxContent = convertToGPX(trackPoints, checkPoints, wayPoints)
+        saveGPXToFile(context, fileName, gpxContent)
+    }
+
     private fun loadSpeedValues() {
         val prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
         minSpeed = prefs.getInt("minSpeed", 5)
@@ -307,8 +426,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
         )
         if (checkpointMarker != null) {
-            //Save checkpoint LatLng
             checkpoints.add(checkpointLatLng)
+            latLngTimeCheckPoints.add(LatLngTime(checkpointLatLng, System.currentTimeMillis()))
         }
     }
 
@@ -324,9 +443,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         if (userLocation != null) {
             waypointStartPosition = userLocation
         }
-
         timerValueAtLastWP = timerValueInSecond
-
+        latLngTimeWayPoints.add(LatLngTime(waypointLatLng, System.currentTimeMillis()))
         drawPath()
     }
 
@@ -581,7 +699,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         val editor = sharedPref.edit()
 
         val gson = Gson()
-        val json = gson.toJson(latLngTime)
+        val jsonPositions = gson.toJson(latLngTime)
+        val jsonCheckpoints = gson.toJson(latLngTimeCheckPoints)
+        val jsonWaypoints = gson.toJson(latLngTimeWayPoints)
 
         editor.putInt(TIMER_VALUE_KEY, timerValueInSecond)
         editor.putInt(TIMER_AT_LAST_CP_KEY, timerValueAtLastCP)
@@ -590,7 +710,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         editor.putBoolean(NORTH_UP, isNorthUp)
         editor.putBoolean(USE_SAVED_ROTATION, useSavedRotation)
         editor.putFloat(SAVED_ROTATION, savedRotation)
-        editor.putString(POSITION_WITH_TIMESTAMP, json)
+        editor.putString(POSITION_WITH_TIMESTAMP, jsonPositions)
+        editor.putString(CHECKPOINT_WITH_TIMESTAMP, jsonCheckpoints)
+        editor.putString(WAYPOINT_WITH_TIMESTAMP, jsonWaypoints)
 
         if (waypointStartPosition != null) {
             editor.putFloat(WAYPOINT_START_POSITION_KEY + "_lat", waypointStartPosition!!.latitude.toFloat())
@@ -647,11 +769,21 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
         val retrievedWaypointLat = sharedPref.getFloat(WAYPOINT_START_POSITION_KEY + "_lat", 0f)
         val retrievedWaypointLon = sharedPref.getFloat(WAYPOINT_START_POSITION_KEY + "_lon", 0f)
-        val jsonFromPrefs = sharedPref.getString(POSITION_WITH_TIMESTAMP, "")
+        val jsonPositionsFromPrefs = sharedPref.getString(POSITION_WITH_TIMESTAMP, "")
+        val jsonCheckpointsFromPrefs = sharedPref.getString(CHECKPOINT_WITH_TIMESTAMP, "")
+        val jsonWaypointsFromPrefs = sharedPref.getString(WAYPOINT_WITH_TIMESTAMP, "")
 
-        if (jsonFromPrefs!!.isNotEmpty()) {
+        if (jsonPositionsFromPrefs!!.isNotEmpty()) {
             val type = object : TypeToken<MutableList<LatLngTime>>() {}.type
-            latLngTime = gson.fromJson(jsonFromPrefs, type)
+            latLngTime = gson.fromJson(jsonPositionsFromPrefs, type)
+        }
+        if (jsonCheckpointsFromPrefs!!.isNotEmpty()) {
+            val type = object : TypeToken<MutableList<LatLngTime>>() {}.type
+            latLngTimeCheckPoints = gson.fromJson(jsonCheckpointsFromPrefs, type)
+        }
+        if (jsonWaypointsFromPrefs!!.isNotEmpty()) {
+            val type = object : TypeToken<MutableList<LatLngTime>>() {}.type
+            latLngTimeWayPoints = gson.fromJson(jsonWaypointsFromPrefs, type)
         }
 
         waypointStartPosition =
@@ -915,6 +1047,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             resetUiState()
             locationServiceRunning = false
             buttonMainStartStopService.text = "START"
+
+            val currentDateTime = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val fileName = "GPX_$currentDateTime"
+
+            generateAndSaveGPX(this, fileName, latLngTime, latLngTimeCheckPoints, latLngTimeWayPoints)
         }
         alertDialogBuilder.setNegativeButton("No") { _, _ -> }
         alertDialogBuilder.create().show()
