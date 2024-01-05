@@ -432,20 +432,22 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     fun addWaypoint(waypointLatLng: LatLng) {
-        currentWaypoint?.remove()
-        //add waypoint as Location
-        currentWaypoint = mMap.addMarker(
-            MarkerOptions()
-                .title("Waypoint")
-                .position(waypointLatLng)
-                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE))
-        )
-        if (userLocation != null) {
-            waypointStartPosition = userLocation
+        if (buttonMainStartStopService.text == "STOP") {
+            currentWaypoint?.remove()
+            //add waypoint as Location
+            currentWaypoint = mMap.addMarker(
+                MarkerOptions()
+                    .title("Waypoint")
+                    .position(waypointLatLng)
+                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE))
+            )
+            if (userLocation != null) {
+                waypointStartPosition = userLocation
+            }
+            timerValueAtLastWP = timerValueInSecond
+            latLngTimeWayPoints.add(LatLngTime(waypointLatLng, System.currentTimeMillis()))
+            drawPath()
         }
-        timerValueAtLastWP = timerValueInSecond
-        latLngTimeWayPoints.add(LatLngTime(waypointLatLng, System.currentTimeMillis()))
-        drawPath()
     }
 
     fun drawPath() {
@@ -970,6 +972,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
         timerValue = "00:00:00"
         textViewTimer.text = timerValue
+
+        textViewOverallDistance.text = "0"
+        textViewOverallSpeed.text = "0"
+        textViewCheckpointDistance.text = "0"
+        textViewCheckpointDistanceDirect.text = "0"
+        textViewCheckpointSpeed.text = "0"
+        textViewWaypointDistanceDirect.text = "0"
+        textViewWaypointDistance.text = "0"
+        textViewWaypointSpeed.text = "0"
     }
 
     private inner class InnerBroadcastReceiver: BroadcastReceiver(){
@@ -1044,7 +1055,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         alertDialogBuilder.setPositiveButton("Yes") { _, _ ->
             stopService(serviceIntent)
             stopService(timerServiceIntent)
-            resetUiState()
+
             locationServiceRunning = false
             buttonMainStartStopService.text = "START"
 
@@ -1052,9 +1063,60 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             val fileName = "GPX_$currentDateTime"
 
             generateAndSaveGPX(this, fileName, latLngTime, latLngTimeCheckPoints, latLngTimeWayPoints)
+            resetVariablesToDefault()
+            resetUiState()
         }
         alertDialogBuilder.setNegativeButton("No") { _, _ -> }
         alertDialogBuilder.create().show()
+    }
+
+    fun resetVariablesToDefault() {
+        // Reset variables to their default values
+        locationServiceRunning = false
+        currentWaypoint?.remove()
+        checkpoints.clear()
+        userLocation = null
+        userHeading = null
+        userSpeed = null
+        userAccuracy = null
+        userAltitude = null
+        userVerticalAccuracy = null
+        polyLineOptions.points.clear()
+        isMapReady = false
+
+        // Reset compass-related variables
+        currentDegree = 0f
+        lastAccelerometerSet = false
+        lastMagnetometerSet = false
+        isCompassVisible = false
+
+        // Reset bottom info variables
+        timerValue = "00:00:00"
+        timerValueInSecond = 0
+        timerValueAtLastCP = 0
+        timerValueAtLastWP = 0
+        waypointStartPosition = null
+        latLngTime.clear()
+        latLngTimeCheckPoints.clear()
+        latLngTimeWayPoints.clear()
+        minSpeed = 0
+        maxSpeed = 0
+
+        // Clear the map
+        mMap.clear()
+
+        // Clear any saved preferences
+        val sharedPrefs = getPreferences(Context.MODE_PRIVATE)
+        with(sharedPrefs.edit()) {
+            remove(TIMER_VALUE_KEY)
+            remove(TIMER_AT_LAST_CP_KEY)
+            remove(TIMER_AT_LAST_WP_KEY)
+            remove(WAYPOINT_START_POSITION_KEY)
+            remove(POSITION_WITH_TIMESTAMP)
+            remove(CHECKPOINT_WITH_TIMESTAMP)
+            remove(WAYPOINT_WITH_TIMESTAMP)
+            apply()
+        }
     }
 
     //TODO: some of the values passed to the api are temporary and should be replaced later.
