@@ -140,7 +140,7 @@
         app:layout_constraintGuide_percent="0.4500684" />
 
     <Button
-        android:id="@+id/button"
+        android:id="@+id/buttonLoad"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:text="@string/load"
@@ -159,7 +159,7 @@
         app:layout_constraintGuide_percent="0.55" />
 
     <Button
-        android:id="@+id/button2"
+        android:id="@+id/buttonDelete"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:text="DELETE"

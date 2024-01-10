@@ -164,6 +164,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        Log.d("MainActivity", "onCreate")
 
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -426,6 +427,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
         )
         if (checkpointMarker != null) {
+            updateSessionCheckpoint(checkpointLatLng)
             checkpoints.add(checkpointLatLng)
             latLngTimeCheckPoints.add(LatLngTime(checkpointLatLng, System.currentTimeMillis()))
         }
@@ -473,6 +475,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
     
     override fun onResume() {
+        Log.d("MainActivity", "onResume")
         loadSpeedValues()
         super.onResume()
         LocalBroadcastManager.getInstance(this).registerReceiver(innerBroadcastReceiver, innerBroadcastReceiverIntentFilter)
@@ -882,6 +885,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         // Restore polyline from saved instance state
         restorePolyLine()
         restoreMarkers()
+        loadFromDB()
     }
 
     private fun updateMapOrientation() {
@@ -1125,6 +1129,87 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         }
     }
 
-    //TODO: some of the values passed to the api are temporary and should be replaced later.
+
+    fun updateSessionCheckpoint(location: LatLng) {
+        val url = "https://sportmap.akaver.com/api/v1.0/GpsLocations"
+        val handler = HttpSingletonHandler.getInstance(this)
+
+        val httpRequest = object : StringRequest(
+            Request.Method.POST,
+            url,
+            Response.Listener { response -> Log.d("Response.Listener", response);
+                val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
+                with (sharedPref.edit()) {
+                    remove("latest_location_update")
+                    putString("latest_location_update", response)
+                    Log.d("updateSession", response)
+                    apply()
+                } },
+            Response.ErrorListener { error ->
+                Log.d(
+                    "Response.ErrorListener",
+                    "${error.message} ${error.networkResponse.statusCode}"
+                )
+            }
+        ) {
+            override fun getBodyContentType(): String {
+                return "application/json"
+            }
+
+            override fun getBody(): ByteArray {
+                val params = HashMap<String, Any?>()
+                //Get shared preferences
+                val savedPreferences = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+                val gpsSessionId = savedPreferences.getString("current_session_id", "")
+                Log.d("TimeSystemMain", convertMillisToTime(System.currentTimeMillis()))
+                params["recordedAt"] = convertMillisToTime(System.currentTimeMillis())
+                params["latitude"] = userLocation?.latitude
+                params["Longitude"] = userLocation?.longitude
+                params["accuracy"] = userAccuracy
+                params["altitude"] = userAltitude
+                params["verticalAccuracy"] = userVerticalAccuracy
+                params["gpsSessionId"] = gpsSessionId
+                params["gpsLocationTypeId"] = "00000000-0000-0000-0000-000000000003"
+
+                val body = JSONObject(params as Map<*, *>).toString()
+                Log.d("getBody", body)
+
+                return body.toByteArray()
+            }
+            override fun getHeaders(): MutableMap<String, String> {
+                val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return mutableMapOf()
+                val token = sharedPref.getString("token", "")
+                val headers = HashMap<String, String>()
+                headers["Authorization"] = "Bearer $token"
+                headers["Content-Type"] = "application/json"
+                return headers
+            }
+        }
+        handler.addToRequestQueue(httpRequest)
+    }
+
+    private fun convertMillisToTime(timestamp: Long, locale: Locale = Locale.getDefault()): String {
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", locale)
+        return dateFormat.format(Date(timestamp))
+    }
+
+
+    private fun loadFromDB(){
+        val prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+        if (prefs.getString("loadedPositions", "") != "") {
+            resetVariablesToDefault()
+            val gson = Gson()
+            val typeLatLngTime = object : TypeToken<MutableList<LatLngTime>>() {}.type
+            val typeLatLng = object : TypeToken<MutableList<LatLng>>() {}.type
+            latLngTime = gson.fromJson(prefs.getString("loadedPositions", ""), typeLatLngTime)
+            polylineViewModel.checkpoints = gson.fromJson(prefs.getString("loadedCheckpoints", ""), typeLatLng)
+            Log.d("loadFromDB", "loadedPositions: ${prefs.getString("loadedPositions", "")}")
+            Log.d("loadFromDB", "loadedCheckpoints: ${prefs.getString("loadedCheckpoints", "")}")
+            drawPathWithSpeedColors(mMap, latLngTime)
+            restoreMarkers()
+            //Set camera on first location
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLngTime[0].position, 18f))
+        }
+    }
 
 }
