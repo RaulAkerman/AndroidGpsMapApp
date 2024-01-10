@@ -158,4 +158,15 @@
         android:orientation="horizontal"
         app:layout_constraintGuide_percent="0.55" />
 
+    <Button
+        android:id="@+id/button2"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:text="DELETE"
+        app:autoSizeTextType="uniform"
+        app:layout_constraintBottom_toTopOf="@+id/guideline19"
+        app:layout_constraintEnd_toStartOf="@+id/guideline11"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/guideline16" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

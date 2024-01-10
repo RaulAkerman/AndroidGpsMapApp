@@ -5,8 +5,10 @@ import android.content.SharedPreferences
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.Spinner
 import androidx.appcompat.app.AlertDialog
 
 class SettingsActivity : AppCompatActivity() {
@@ -16,6 +18,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var editTextNumberMaximumSpeed: EditText
     private lateinit var buttonRegister: Button
     private lateinit var buttonLogin: Button
+    private lateinit var spinnerSessions: Spinner
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
@@ -25,6 +28,7 @@ class SettingsActivity : AppCompatActivity() {
         buttonSettingsApply = findViewById(R.id.buttonSettingsApply)
         buttonRegister = findViewById(R.id.buttonRegister)
         buttonLogin = findViewById(R.id.buttonLogin)
+        spinnerSessions = findViewById(R.id.spinnerPreviousSessions)
 
         buttonSettingsApply.setOnClickListener {
             saveSpeedValues()
@@ -39,9 +43,15 @@ class SettingsActivity : AppCompatActivity() {
             showLoginDialog()
         }
 
+        val names = listOf("John", "Jane", "Bob", "Alice")
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, names)
+
         val prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
         val savedMinSpeed = prefs.getInt("minSpeed", 5)
         val savedMaxSpeed = prefs.getInt("maxSpeed", 10)
+
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinnerSessions.adapter = adapter
 
         editTextNumberMinimumSpeed.setText(savedMinSpeed.toString())
         editTextNumberMaximumSpeed.setText(savedMaxSpeed.toString())
