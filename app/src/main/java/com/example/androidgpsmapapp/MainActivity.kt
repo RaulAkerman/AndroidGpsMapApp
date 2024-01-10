@@ -2,6 +2,7 @@ package com.example.androidgpsmapapp
 
 import HttpSingletonHandler
 import android.Manifest
+import android.app.ActivityManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.BroadcastReceiver
@@ -12,14 +13,21 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.hardware.Sensor
 import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.util.Log
+import android.util.Xml
+import android.view.View
+import android.view.animation.Animation.RELATIVE_TO_SELF
+import android.view.animation.RotateAnimation
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -37,25 +45,18 @@ import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.Polyline
 import com.google.android.gms.maps.model.PolylineOptions
-import org.json.JSONObject
-import android.hardware.SensorEventListener
-import android.view.animation.Animation.RELATIVE_TO_SELF
-import android.view.animation.RotateAnimation
 import com.google.gson.Gson
-import java.lang.Math.toDegrees
-import android.util.Xml
-import org.xmlpull.v1.XmlSerializer
-import java.io.StringWriter
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import android.os.Environment
-import android.view.View
-import android.widget.Toast
 import com.google.gson.reflect.TypeToken
+import org.json.JSONObject
+import org.xmlpull.v1.XmlSerializer
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.StringWriter
+import java.lang.Math.toDegrees
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.TimeZone
 
 
@@ -93,6 +94,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private val polyLineOptions = PolylineOptions().width(10f)
     private var polyline : Polyline? = null
     private var markerPolyLine: Polyline? = null
+    private val polylineList = mutableListOf<Polyline>()
     private var isMapReady = false
 
     //Compass
@@ -164,7 +166,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        Log.d("MainActivity", "onCreate")
 
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -273,7 +274,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     private fun createNotificationChannel() {
-        //Log.d(TAG, "createNotificationChannel")
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -306,14 +306,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             ) != PackageManager.PERMISSION_GRANTED
 
         ) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
-            //Log.d(TAG, "NO LOCATION ACCESS, NO NOTIFICATIONS ")
             requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.POST_NOTIFICATIONS), C.REQUEST_PERMISSIONS_CODE)
         }
     }
@@ -494,7 +486,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
     
     override fun onResume() {
-        Log.d("MainActivity", "onResume")
         loadSpeedValues()
         super.onResume()
         LocalBroadcastManager.getInstance(this).registerReceiver(innerBroadcastReceiver, innerBroadcastReceiverIntentFilter)
@@ -600,7 +591,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         if (lastCheckpointIndex >= 0 && userLocation != null) {
             val lastCheckpoint = checkpoints[lastCheckpointIndex]
 
-            Log.d(TAG, "lasCP: $checkpoints[lastCheckpointIndex]")
             // Calculate polyline distance
             val polylineDistance = calculatePolylineDistance(lastCheckpoint, userLocation!!)
 
@@ -653,7 +643,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 }
 
                 if (foundStart) {
-                    Log.d(TAG, "foundStart")
                     // Accumulate distances between consecutive polyline points
                     totalDistance += calculateDistance(prevLatLng, currentLatLng)
 
@@ -676,13 +665,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
     //====
     override fun onMapClick(p0: LatLng) {
-        Log.d(TAG, "onMapClick")
         addWaypoint(p0)
         drawPath()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        Log.d(TAG, "onSaveInstanceState")
         super.onSaveInstanceState(outState)
         //Save polyline to view model
         polylineViewModel.polylinePoints = polyLineOptions.points
@@ -749,7 +736,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         loadSpeedValues()
         val gson = Gson()
-        Log.d(TAG, "onRestoreInstanceState")
         super.onRestoreInstanceState(savedInstanceState)
         //Restore polyline from view model
         polylineViewModel.polylinePoints =
@@ -820,7 +806,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
     fun restorePolyLine(){
         loadSpeedValues()
-        Log.d(TAG, "onRestoreLine")
         polylineViewModel.polylinePoints?.let {
             polyLineOptions.color(Color.TRANSPARENT)
             polyLineOptions.addAll(it)
@@ -831,8 +816,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     fun restoreMarkers(){
+        println("Called: RestoreMarkers")
         if (polylineViewModel.checkpoints != null) {
             for (checkpoint in polylineViewModel.checkpoints!!) {
+                println("Checkpoinbt: $checkpoint")
                 loadCheckpoint(checkpoint)
             }
         }
@@ -887,13 +874,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 Manifest.permission.ACCESS_COARSE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
             return
         }
 
@@ -935,13 +915,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     private fun updateLocation(lat: Double, lon: Double, timestamp: Long){
-        polyline?.remove()
+        println("Called: updateLocation")
 
         val latLng = LatLng(lat, lon)
         val newPositionWithTime = LatLngTime(LatLng(lat, lon), timestamp)
         latLngTime.add(newPositionWithTime)
-
-        Log.d(TAG, "Lat: $userSpeed Lng: $lon Timestamp: $timestamp")
 
         polyLineOptions.add(latLng).color(Color.TRANSPARENT)
         polyline = mMap.addPolyline(polyLineOptions)
@@ -964,6 +942,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             return
         }
 
+        clearPolylines()
+
         for (i in 0 until points.size - 1) {
             val startPoint = points[i]
             val endPoint = points[i + 1]
@@ -975,8 +955,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 .color(getColorForSpeed(speed))
                 .width(10f) // Set your desired polyline width here
 
-            googleMap.addPolyline(polylineOptions)
+            // Add the polyline to the map and store its reference in the list
+            val polyline = googleMap.addPolyline(polylineOptions)
+            polylineList.add(polyline)
         }
+    }
+
+    private fun clearPolylines() {
+        for (polyline in polylineList) {
+            polyline.remove()  // Remove the polyline from the map
+        }
+        polylineList.clear()  // Clear the list
     }
 
     private fun getColorForSpeed(speed: Double): Int {
@@ -1039,7 +1028,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                     LocalBroadcastManager.getInstance(this@MainActivity).sendBroadcast(returnIntent)
                 }
                 C.ACTION_PLACE_CHECKPOINT -> {
-                    Log.d(TAG, "ACTION_PLACE_CHECKPOINT")
                     val checkpointLatLng = LatLng(
                         broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0),
                         broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0)
@@ -1155,14 +1143,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         val httpRequest = object : StringRequest(
             Method.POST,
             url,
-            Response.Listener { response -> Log.d("Response.Listener", response);
+            Response.Listener { response ->
                 val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
                 with (sharedPref.edit()) {
                     remove("latest_location_update")
                     putString("latest_location_update", response)
-                    Log.d("updateSession", response)
+                    // Log statement removed
                     apply()
-                } },
+                }
+            },
             Response.ErrorListener { error ->
                 Log.d(
                     "Response.ErrorListener",
@@ -1179,7 +1168,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 //Get shared preferences
                 val savedPreferences = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
                 val gpsSessionId = savedPreferences.getString("current_session_id", "")
-                Log.d("TimeSystemMain", convertMillisToTime(System.currentTimeMillis()))
                 params["recordedAt"] = convertMillisToTime(System.currentTimeMillis())
                 params["latitude"] = userLocation?.latitude
                 params["Longitude"] = userLocation?.longitude
@@ -1190,7 +1178,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 params["gpsLocationTypeId"] = "00000000-0000-0000-0000-000000000003"
 
                 val body = JSONObject(params as Map<*, *>).toString()
-                Log.d("getBody", body)
 
                 return body.toByteArray()
             }

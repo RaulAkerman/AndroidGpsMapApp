@@ -90,8 +90,6 @@ class SettingsActivity : AppCompatActivity() {
             editor.apply()
             deleteSession(selectedSessionId!!)
             finish()
-
-            Log.d("sessionsAfter", sessions.toString())
         }
 
         loadButton.setOnClickListener {
@@ -194,13 +192,14 @@ class SettingsActivity : AppCompatActivity() {
         var httpRequest = object : StringRequest(
             Request.Method.POST,
             url,
-            Response.Listener { response -> Log.d("Response.Listener", response);
+            Response.Listener { response ->
                 val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
-                Log.d("Response.Listener", response)
+
                 with (sharedPref.edit()) {
                     putString("token", JSONObject(response).getString("token"))
                     apply()
-                } },
+                }
+            },
             Response.ErrorListener { error ->  Log.d("Response.ErrorListener", "${error.message} ${error.networkResponse.statusCode}")}
         ){
             override fun getBodyContentType(): String {
@@ -214,7 +213,6 @@ class SettingsActivity : AppCompatActivity() {
                 params["lastName"] = lastName
 
                 var body = JSONObject(params as Map<*, *>).toString()
-                Log.d("getBody", body)
 
                 return body.toByteArray()
             }
@@ -231,13 +229,15 @@ class SettingsActivity : AppCompatActivity() {
         val httpRequest = object : StringRequest(
             Request.Method.POST,
             url,
-            Response.Listener { response -> Log.d("Response.Listener", response);
+            Response.Listener { response ->
                 val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
-                with (sharedPref.edit()) {
+
+                with(sharedPref.edit()) {
                     putString("token", JSONObject(response).getString("token"))
                     apply()
                     buttonLogin.text = "Logout"
-                } },
+                }
+            },
             Response.ErrorListener { error ->  Log.d("Response.ErrorListener", "${error.message} ${error.networkResponse.statusCode}")}
         ){
             override fun getBodyContentType(): String {
@@ -249,8 +249,6 @@ class SettingsActivity : AppCompatActivity() {
                 params["password"] = password
 
                 val body = JSONObject(params as Map<*, *>).toString()
-                Log.d("getBody", body)
-
                 return body.toByteArray()
             }
         }
@@ -265,9 +263,9 @@ class SettingsActivity : AppCompatActivity() {
         val httpRequest = object : StringRequest(
             Request.Method.DELETE,
             url,
-            Response.Listener { response -> Log.d("Response.Listener", response);
+            Response.Listener { response ->
                 Log.d("Response.Listener", response)
-                              },
+            },
             Response.ErrorListener { error ->  Log.d("Response.ErrorListener", "${error.message} ${error.networkResponse.statusCode}")}
         ) {
             override fun getHeaders(): MutableMap<String, String> {
@@ -282,32 +280,6 @@ class SettingsActivity : AppCompatActivity() {
         handler.addToRequestQueue(httpRequest)
     }
 
-//    fun getSessionData(sessionId: String) {
-//        val url = "https://sportmap.akaver.com/api/v1.0/GpsLocations?GpsSessionId=$sessionId"
-//        val handler = HttpSingletonHandler.getInstance(this)
-//
-//        val httpRequest = object : StringRequest(
-//            Request.Method.GET,
-//            url,
-//            Response.Listener { response -> Log.d("Response.Listener", response);
-//                val prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
-//                //Response is a list of json objects
-//                Log.d("RESPONSE", response)
-//            },
-//            Response.ErrorListener { error ->  Log.d("Response.ErrorListener", "${error.message} ${error.networkResponse.statusCode}")}
-//        ) {
-//            override fun getHeaders(): MutableMap<String, String> {
-//                val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return mutableMapOf()
-//                val token = sharedPref.getString("token", "")
-//                val headers = HashMap<String, String>()
-//                headers["Authorization"] = "Bearer $token"
-//                headers["Content-Type"] = "application/json"
-//                return headers
-//            }
-//        }
-//        handler.addToRequestQueue(httpRequest)
-//    }
-
     fun getSessionData(sessionId: String) {
         val url = "https://sportmap.akaver.com/api/v1.0/GpsLocations?GpsSessionId=$sessionId"
         val handler = HttpSingletonHandler.getInstance(this)
@@ -316,7 +288,6 @@ class SettingsActivity : AppCompatActivity() {
             Request.Method.GET,
             url,
             Response.Listener { response ->
-                Log.d("Response.Listener", response)
                 val gson = Gson()
 
                 // Parse the JSON array response
@@ -378,24 +349,12 @@ class SettingsActivity : AppCompatActivity() {
     data class LatLngTime(val position: LatLng, val timestamp: Long)
 
     fun convertToLatLngTime(item: JSONObject): LatLngTime? {
-        Log.d("JsonItem", item.toString())
         val latitude = item.getDouble("latitude")
         val longitude = item.getDouble("longitude")
         val timestamp = dateStringToSystemTimeInMillis(item.getString("recordedAt"))
         val latLng = LatLng(latitude, longitude)
         return LatLngTime(latLng, timestamp)
     }
-
-//    // Assuming your list is called 'locationList'
-//    val locationList = /* your list here */
-//
-//    val latLngTimeList = locationList.map { convertToLatLngTime(it) }
-//
-//    // Now you have the list of LatLngTime objects, you can use it as needed.
-//    for (latLngTime in latLngTimeList) {
-//        // Perform operations with each LatLngTime object
-//        println("Latitude: ${latLngTime.position.latitude}, Longitude: ${latLngTime.position.longitude}, Timestamp: ${latLngTime.timestamp}")
-//    }
 
     fun dateStringToSystemTimeInMillis(dateString: String): Long {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())

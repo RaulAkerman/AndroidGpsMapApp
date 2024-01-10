@@ -17,7 +17,6 @@ class TimerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "onStartCommand")
         LocalBroadcastManager.getInstance(this).sendBroadcast(Intent(C.ACTION_TIMER_SERVICE_START))
         when (intent?.action) {
             ACTION_TIMER_RESET -> {
@@ -32,7 +31,6 @@ class TimerService : Service() {
     private fun startTimer() {
         scheduledExecutorService.scheduleAtFixedRate(
             {
-                Log.d(TAG, "scheduledExecutorService 'timer' running: $seconds seconds")
                 val intent = Intent(C.ACTION_TIMER)
                 seconds++
                 intent.putExtra(C.PAYLOAD_TIME, "$seconds")
@@ -52,7 +50,6 @@ class TimerService : Service() {
     }
 
     override fun onDestroy() {
-        Log.d(TAG, "onDestroy Service")
         super.onDestroy()
         scheduledExecutorService.shutdown()
         LocalBroadcastManager.getInstance(this).sendBroadcast(Intent(C.ACTION_TIMER_SERVICE_DESTROY))

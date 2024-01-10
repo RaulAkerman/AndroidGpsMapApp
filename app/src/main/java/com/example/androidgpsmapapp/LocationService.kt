@@ -68,7 +68,6 @@ class LocationService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // call within 5 seconds from start
-        Log.d(TAG, "onStartCommand")
         showNotification()
         locationQueue.clear()
         innerBroadcastReceiverIntentFilter.addAction(C.ACTION_STOP_CHECKPOINT_BROADCAST)
@@ -139,7 +138,6 @@ class LocationService : Service() {
     private fun sendAddCheckpointBroadcast() {
 //        val handler = Handler()
         val delayMillis = 5000 // Set your desired delay time in milliseconds
-        Log.d(TAG, "sendAddCheckpointBroadcast")
         handler.postDelayed(object : Runnable {
             override fun run() {
                 //Send broadcast for every location saved in the list
@@ -152,7 +150,6 @@ class LocationService : Service() {
 
                 // Check for the condition to stop sending broadcasts
                 if (checkpoints.size == 0) {
-                    Log.d(TAG, "stopAddCheckpointBroadcast")
                     handler.removeCallbacks(this)
                 } else {
                     handler.postDelayed(this, delayMillis.toLong())
@@ -221,14 +218,13 @@ class LocationService : Service() {
         if (prevLocation != null) {
             val distance = prevLocation!!.distanceTo(location)
 
-            if (distance in 1.0..25.0) {
+            if (distance in 3.0..25.0) {
                 totalDistance += distance
                 prevLocation = location
                 showNotification()
                 //sendLocationUpdateBroadcast(location)
                 locationQueue.add(location)
                 updateSession(location, "00000000-0000-0000-0000-000000000001")
-
             }
         } else {
             prevLocation = location
@@ -249,7 +245,6 @@ class LocationService : Service() {
         broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_VERTICAL_ACCURACY, location.verticalAccuracyMeters)
         broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_TIMESTAMP, location.time)
 
-        Log.d(TAG, "sendLocationUpdateBroadcast")
         LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
     }
 
@@ -271,7 +266,6 @@ class LocationService : Service() {
                 val lon = intent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0)
                 for (location in locationQueue) {
                     if (location.latitude == lat && location.longitude == lon) {
-                        Log.d(TAG, "Location removed from queue")
                         locationQueue.remove(location)
                         break
                     }
@@ -315,15 +309,16 @@ class LocationService : Service() {
         val httpRequest = object : StringRequest(
             Request.Method.POST,
             url,
-            Response.Listener { response -> Log.d("Response.Listener", response);
+            Response.Listener { response ->
                 val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
                 with (sharedPref.edit()) {
                     putString("current_session_id", JSONObject(response).getString("id"))
                     sessionsIdList.add(JSONObject(response).getString("id"))
                     putStringSet("sessions_id_list", sessionsIdList.toSet())
-                    Log.d("sessionList", sessionsIdList.toString())
+                    // Log statements removed
                     apply()
-                } },
+                }
+            },
             Response.ErrorListener { error ->
                 Log.d(
                     "Response.ErrorListener",
@@ -368,13 +363,14 @@ class LocationService : Service() {
         val httpRequest = object : StringRequest(
             Request.Method.POST,
             url,
-            Response.Listener { response -> Log.d("Response.Listener", response);
+            Response.Listener { response ->
                 val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
                 with (sharedPref.edit()) {
                     remove("latest_location_update")
                     putString("latest_location_update", response)
                     apply()
-                } },
+                }
+            },
             Response.ErrorListener { error ->
                 Log.d(
                     "Response.ErrorListener",
@@ -391,7 +387,6 @@ class LocationService : Service() {
                 //Get shared preferences
                 val savedPreferences = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
                 val gpsSessionId = savedPreferences.getString("current_session_id", "")
-                Log.d("TimeLocation", convertMillisToTime(location.time))
                 params["recordedAt"] = convertMillisToTime(location.time)
                 params["latitude"] = location.latitude
                 params["Longitude"] = location.longitude
@@ -402,7 +397,6 @@ class LocationService : Service() {
                 params["gpsLocationTypeId"] = "00000000-0000-0000-0000-000000000001"
 
                 val body = JSONObject(params as Map<*, *>).toString()
-
 
                 return body.toByteArray()
             }
@@ -425,14 +419,15 @@ class LocationService : Service() {
         val httpRequest = object : StringRequest(
             Request.Method.POST,
             url,
-            Response.Listener { response -> Log.d("Response.Listener", response);
+            Response.Listener { response ->
                 val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
                 with (sharedPref.edit()) {
                     remove("latest_location_update")
                     putString("latest_location_update", response)
-                    Log.d("updateSession", response)
+                    // Log statement removed
                     apply()
-                } },
+                }
+            },
             Response.ErrorListener { error ->
                 Log.d(
                     "Response.ErrorListener",
@@ -449,7 +444,6 @@ class LocationService : Service() {
                 //Get shared preferences
                 val savedPreferences = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
                 val gpsSessionId = savedPreferences.getString("current_session_id", "")
-                Log.d("TimeSystem", convertMillisToTime(System.currentTimeMillis()))
                 params["recordedAt"] = convertMillisToTime(System.currentTimeMillis())
                 params["latitude"] = location.latitude
                 params["Longitude"] = location.longitude
@@ -460,8 +454,6 @@ class LocationService : Service() {
                 params["gpsLocationTypeId"] = "00000000-0000-0000-0000-000000000003"
 
                 val body = JSONObject(params as Map<*, *>).toString()
-                Log.d("getBody", body)
-
                 return body.toByteArray()
             }
             override fun getHeaders(): MutableMap<String, String> {
