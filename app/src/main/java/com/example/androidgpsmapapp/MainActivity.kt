@@ -17,7 +17,6 @@ import android.location.Location
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.view.View
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
@@ -25,7 +24,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.android.volley.Request
 import com.android.volley.Response
 import com.android.volley.toolbox.StringRequest
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -52,13 +50,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import android.os.Environment
+import android.view.View
 import android.widget.Toast
 import com.google.gson.reflect.TypeToken
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
-
-
+import java.util.TimeZone
 
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapClickListener, SensorEventListener {
@@ -78,6 +76,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private lateinit var buttonCenter: Button
     private lateinit var buttonNorthUp: Button
     private lateinit var buttonSetRotation: Button
+    private lateinit var buttonMainAddWP: Button
 
     private val innerBroadcastReceiver = InnerBroadcastReceiver()
     private val innerBroadcastReceiverIntentFilter = IntentFilter()
@@ -155,6 +154,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private val WAYPOINT_WITH_TIMESTAMP = "waypointWithTimestamp"
 
     data class LatLngTime(val position: LatLng, val timestamp: Long)
+
     private var latLngTime: MutableList<LatLngTime> = mutableListOf()
     private var latLngTimeCheckPoints: MutableList<LatLngTime> = mutableListOf()
     private var latLngTimeWayPoints: MutableList<LatLngTime> = mutableListOf()
@@ -178,6 +178,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         buttonCenter = findViewById(R.id.buttonCenter)
         buttonNorthUp = findViewById(R.id.buttonNorthUp)
         buttonSetRotation = findViewById(R.id.buttonSetRotation)
+        buttonMainAddWP = findViewById(R.id.buttonMainAddWP)
 
         //Bottom info
         textViewOverallDistance = findViewById(R.id.textViewOverallDistance)
@@ -247,6 +248,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                     useSavedRotation = true
                 }
             }
+        }
+
+        buttonMainAddWP.setOnClickListener {
+            loadFromDB()
         }
 
         //Compass
@@ -427,7 +432,21 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                 .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
         )
         if (checkpointMarker != null) {
-            updateSessionCheckpoint(checkpointLatLng)
+            updateSessionCheckpoint()
+            checkpoints.add(checkpointLatLng)
+            latLngTimeCheckPoints.add(LatLngTime(checkpointLatLng, System.currentTimeMillis()))
+        }
+    }
+
+    fun loadCheckpoint(checkpointLatLng: LatLng) {
+        val checkpointMarker = mMap.addMarker(
+            MarkerOptions()
+                .title("Checkpoint")
+                .position(checkpointLatLng)
+                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
+        )
+        if (checkpointMarker != null) {
+            println(checkpointLatLng)
             checkpoints.add(checkpointLatLng)
             latLngTimeCheckPoints.add(LatLngTime(checkpointLatLng, System.currentTimeMillis()))
         }
@@ -814,7 +833,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     fun restoreMarkers(){
         if (polylineViewModel.checkpoints != null) {
             for (checkpoint in polylineViewModel.checkpoints!!) {
-                addCheckpoint(checkpoint)
+                loadCheckpoint(checkpoint)
             }
         }
         if (polylineViewModel.waypoints != null) {
@@ -838,9 +857,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             showStopServiceConfirmationDialog(serviceIntent)
         } else {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                resetVariablesToDefault()
                 startForegroundService(serviceIntent)
                 startService(timerServiceIntent)
             } else {
+                resetVariablesToDefault()
                 startService(serviceIntent)
                 startService(timerServiceIntent)
             }
@@ -885,7 +906,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         // Restore polyline from saved instance state
         restorePolyLine()
         restoreMarkers()
-        loadFromDB()
+
     }
 
     private fun updateMapOrientation() {
@@ -1082,7 +1103,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
 
     fun resetVariablesToDefault() {
         // Reset variables to their default values
-        locationServiceRunning = false
         currentWaypoint?.remove()
         checkpoints.clear()
         userLocation = null
@@ -1109,8 +1129,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         latLngTime.clear()
         latLngTimeCheckPoints.clear()
         latLngTimeWayPoints.clear()
-        minSpeed = 0
-        maxSpeed = 0
 
         // Clear the map
         mMap.clear()
@@ -1130,12 +1148,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
 
-    fun updateSessionCheckpoint(location: LatLng) {
+    fun updateSessionCheckpoint() {
         val url = "https://sportmap.akaver.com/api/v1.0/GpsLocations"
         val handler = HttpSingletonHandler.getInstance(this)
 
         val httpRequest = object : StringRequest(
-            Request.Method.POST,
+            Method.POST,
             url,
             Response.Listener { response -> Log.d("Response.Listener", response);
                 val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
@@ -1193,23 +1211,60 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         return dateFormat.format(Date(timestamp))
     }
 
-
     private fun loadFromDB(){
+        val gson = Gson()
         val prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
-        if (prefs.getString("loadedPositions", "") != "") {
-            resetVariablesToDefault()
-            val gson = Gson()
-            val typeLatLngTime = object : TypeToken<MutableList<LatLngTime>>() {}.type
-            val typeLatLng = object : TypeToken<MutableList<LatLng>>() {}.type
-            latLngTime = gson.fromJson(prefs.getString("loadedPositions", ""), typeLatLngTime)
-            polylineViewModel.checkpoints = gson.fromJson(prefs.getString("loadedCheckpoints", ""), typeLatLng)
-            Log.d("loadFromDB", "loadedPositions: ${prefs.getString("loadedPositions", "")}")
-            Log.d("loadFromDB", "loadedCheckpoints: ${prefs.getString("loadedCheckpoints", "")}")
-            drawPathWithSpeedColors(mMap, latLngTime)
+        val typeLatLngTime = object : TypeToken<MutableList<LatLngTime>>() {}.type
+
+        latLngTime = gson.fromJson(prefs.getString("loadedPositions", ""), typeLatLngTime)
+
+        if (latLngTime.size > 0) {
+            latLngTimeCheckPoints = gson.fromJson(prefs.getString("loadedCheckpoints", ""), typeLatLngTime)
+
+            val latLngList: MutableList<LatLng> = latLngTime.map { it.position }.toMutableList()
+            val latLngCheckpointList: MutableList<LatLng> = latLngTimeCheckPoints.map { it.position }.toMutableList()
+
+            polylineViewModel.checkpoints = latLngCheckpointList
+            polylineViewModel.polylinePoints = latLngList
+            polyline = mMap.addPolyline(polyLineOptions)
+            timerValueInSecond = calculateTotalTimeInSeconds(latLngTime)
+            textViewTimer.text = calculateTotalTime(latLngTime)
+
+            restorePolyLine()
             restoreMarkers()
-            //Set camera on first location
+            updateOverallDistance()
+
+
             mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLngTime[0].position, 18f))
         }
     }
 
+    fun calculateTotalTime(latLngTimeList: List<LatLngTime>): String {
+        if (latLngTimeList.isEmpty()) {
+            return "00:00:00"
+        }
+
+        val dateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+
+        val startTime = Date(latLngTimeList.first().timestamp)
+        val endTime = Date(latLngTimeList.last().timestamp)
+
+        val elapsedTime = endTime.time - startTime.time
+
+        dateFormat.timeZone = TimeZone.getTimeZone("UTC")
+
+        return dateFormat.format(Date(elapsedTime))
+    }
+
+    fun calculateTotalTimeInSeconds(latLngTimeList: List<LatLngTime>): Int {
+        if (latLngTimeList.isEmpty()) {
+            return 0
+        }
+
+        val startTime = latLngTimeList.first().timestamp
+        val endTime = latLngTimeList.last().timestamp
+
+        // Calculate elapsed time in seconds
+        return ((endTime - startTime) / 1000).toInt()
+    }
 }

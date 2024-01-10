@@ -155,7 +155,6 @@ class SettingsActivity : AppCompatActivity() {
             .setNegativeButton("Cancel") { dialog, _ ->
                 dialog.dismiss()
             }
-
         val alertDialog = builder.create()
         alertDialog.show()
     }
@@ -164,6 +163,8 @@ class SettingsActivity : AppCompatActivity() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.login_dialog, null)
         val emailEditText: EditText = dialogView.findViewById(R.id.editTextLoginEmail)
         val passwordEditText: EditText = dialogView.findViewById(R.id.editTextLoginPassword)
+
+
 
         val builder = AlertDialog.Builder(this)
         builder.setView(dialogView)
