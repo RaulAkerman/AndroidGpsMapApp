@@ -53,7 +53,7 @@ import java.util.Date
 import java.util.Locale
 import android.os.Environment
 import android.widget.Toast
-import com.google.firebase.crashlytics.buildtools.reloc.com.google.common.reflect.TypeToken
+import com.google.gson.reflect.TypeToken
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException

@@ -27,6 +27,13 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Date
+import java.util.Locale
 
 class LocationService : Service() {
     companion object {
@@ -45,6 +52,8 @@ class LocationService : Service() {
     private lateinit var locationCallBack: LocationCallback
 
     private var prevLocation: Location? = null
+
+    private var sessionsIdList = mutableListOf<String>()
 
     private var totalDistance = 0.0
     private var timerValue: Int = 0
@@ -76,7 +85,7 @@ class LocationService : Service() {
 
         innerBroadcastReceiverIntentFilter.addAction(C.ACTION_TIMER)
         LocalBroadcastManager.getInstance(this).registerReceiver(timeUpdateReceiver, innerBroadcastReceiverIntentFilter)
-
+        startSession()
         return START_STICKY
     }
 
@@ -173,6 +182,8 @@ class LocationService : Service() {
                 onLocationUpdate(locationResult.lastLocation!!)
             }
         }
+        val prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+        sessionsIdList = prefs.getStringSet("sessions_id_list", mutableSetOf())!!.toMutableList()
 
         getLastKnownLocation()
 
@@ -225,6 +236,7 @@ class LocationService : Service() {
                 showNotification()
                 //sendLocationUpdateBroadcast(location)
                 locationQueue.add(location)
+                updateSession(location, "00000000-0000-0000-0000-000000000001")
 
             }
         } else {
@@ -315,7 +327,9 @@ class LocationService : Service() {
             Response.Listener { response -> Log.d("Response.Listener", response);
                 val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
                 with (sharedPref.edit()) {
-                    putString("session_id", JSONObject(response).getString("id"))
+                    sessionsIdList.add(JSONObject(response).getString("id"))
+                    putStringSet("sessions_id_list", sessionsIdList.toSet())
+                    Log.d("startSession", response)
                     apply()
                 } },
             Response.ErrorListener { error ->
@@ -330,53 +344,34 @@ class LocationService : Service() {
             }
 
             override fun getBody(): ByteArray {
+                val sharedPrefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
                 val params = HashMap<String, Any?>()
-                val currentDate = java.util.Calendar.getInstance().time
+                val currentDate = convertMillisToTime(System.currentTimeMillis())
+                Log.d("currentDate", currentDate)
                 params["name"] = "sessionName"
                 params["description"] = "sessionDescription"
                 params["recordedAt"] = currentDate
-                params["minSpeed"] = 420
-                params["maxSpeed"] = 600
+                params["paceMax"] = speedToSecondsPerKilometer(sharedPrefs.getInt("minSpeed", 0)).toInt()
+                params["paceMin"] = speedToSecondsPerKilometer(sharedPrefs.getInt("maxSpeed", 0)).toInt()
 
                 val body = JSONObject(params as Map<*, *>).toString()
                 Log.d("getBody", body)
 
                 return body.toByteArray()
             }
-        }
-        handler.addToRequestQueue(httpRequest)
-    }
-
-    //Gets the location types, unnecessary since they are hardcoded in the backend
-    fun getLocationTypes() {
-        val url = "https://sportmap.akaver.com/api/v1.0/GpsLocationTypes"
-        val handler = HttpSingletonHandler.getInstance(this)
-
-        val httpRequest = object : StringRequest(
-            Request.Method.GET,
-            url,
-            Response.Listener { response -> Log.d("Response.Listener", response);
-                val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
-                with (sharedPref.edit()) {
-                    putString("gps_location_types", response)
-                    apply()
-                } },
-            Response.ErrorListener { error ->
-                Log.d(
-                    "Response.ErrorListener",
-                    "${error.message} ${error.networkResponse.statusCode}"
-                )
-            }
-        )
-        {
-            override fun getBodyContentType(): String {
-                return "application/json"
+            override fun getHeaders(): MutableMap<String, String> {
+                val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return mutableMapOf()
+                val token = sharedPref.getString("token", "")
+                val headers = HashMap<String, String>()
+                headers["Authorization"] = "Bearer $token"
+                headers["Content-Type"] = "application/json"
+                return headers
             }
         }
         handler.addToRequestQueue(httpRequest)
     }
 
-    fun updateSession() {
+    fun updateSession(location: Location, typeId: String) {
         val url = "https://sportmap.akaver.com/api/v1.0/GpsLocations"
         val handler = HttpSingletonHandler.getInstance(this)
 
@@ -388,6 +383,7 @@ class LocationService : Service() {
                 with (sharedPref.edit()) {
                     remove("latest_location_update")
                     putString("latest_location_update", response)
+                    Log.d("updateSession", response)
                     apply()
                 } },
             Response.ErrorListener { error ->
@@ -406,12 +402,12 @@ class LocationService : Service() {
                 //Get shared preferences
                 val savedPreferences = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
                 val gpsSessionId = savedPreferences.getString("session_id", "")
-                params["recordedAt"] = "2021-11-11T11:11:11.111Z"
-                params["latitude"] = ""
-                params["Longitude"] = ""
-                params["accuracy"] = ""
-                params["altitude"] = "userAltitude"
-                params["verticalAccuracy"] = ""
+                params["recordedAt"] = convertMillisToTime(location.time)
+                params["latitude"] = location.latitude
+                params["Longitude"] = location.longitude
+                params["accuracy"] = location.accuracy
+                params["altitude"] = location.altitude
+                params["verticalAccuracy"] = location.verticalAccuracyMeters
                 params["gpsSessionId"] = gpsSessionId
                 params["gpsLocationTypeId"] = "00000000-0000-0000-0000-000000000001"
 
@@ -420,9 +416,31 @@ class LocationService : Service() {
 
                 return body.toByteArray()
             }
+            override fun getHeaders(): MutableMap<String, String> {
+                val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return mutableMapOf()
+                val token = sharedPref.getString("token", "")
+                val headers = HashMap<String, String>()
+                headers["Authorization"] = "Bearer $token"
+                headers["Content-Type"] = "application/json"
+                return headers
+            }
         }
         handler.addToRequestQueue(httpRequest)
     }
 
+    private fun convertMillisToTime(timestamp: Long, locale: Locale = Locale.getDefault()): String {
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", locale)
+        return dateFormat.format(Date(timestamp))
+    }
 
+    fun speedToSecondsPerKilometer(speed: Int) : Double {
+        if (speed <= 0) {
+            throw IllegalArgumentException("Speed must be greater than zero.")
+        }
+
+        // Convert speed from km/h to minutes per kilometer
+        val minutesPerKilometer = 60.0 / speed
+
+        return minutesPerKilometer  * 60
+    }
 }
