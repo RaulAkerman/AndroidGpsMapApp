@@ -4,12 +4,17 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Spinner
 import androidx.appcompat.app.AlertDialog
+import com.android.volley.Request
+import com.android.volley.Response
+import com.android.volley.toolbox.StringRequest
+import org.json.JSONObject
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -19,6 +24,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var buttonRegister: Button
     private lateinit var buttonLogin: Button
     private lateinit var spinnerSessions: Spinner
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
@@ -40,7 +46,16 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         buttonLogin.setOnClickListener {
-            showLoginDialog()
+            if (buttonLogin.text == "Logout") {
+                val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@setOnClickListener
+                with (sharedPref.edit()) {
+                    putString("token", null)
+                    apply()
+                }
+                buttonLogin.text = "Login"
+            } else{
+                showLoginDialog()
+            }
         }
 
         val names = listOf("John", "Jane", "Bob", "Alice")
@@ -51,6 +66,9 @@ class SettingsActivity : AppCompatActivity() {
         val savedMaxSpeed = prefs.getInt("maxSpeed", 10)
 
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        if (prefs.getString("token", null) != null && !prefs.getString("token", null).isNullOrEmpty()) {
+            buttonLogin.text = "Logout"
+        }
         spinnerSessions.adapter = adapter
 
         editTextNumberMinimumSpeed.setText(savedMinSpeed.toString())
@@ -89,11 +107,7 @@ class SettingsActivity : AppCompatActivity() {
                 val confirmPassword = confirmPasswordEditText.text.toString()
 
                 // Perform registration. Temp to show input values
-                println("Email: $email")
-                println("First Name: $firstName")
-                println("Last Name: $lastName")
-                println("Password: $password")
-                println("Confirm Password: $confirmPassword")
+                register(dialogView, email, password, firstName, lastName)
 
                 dialog.dismiss()
             }
@@ -112,15 +126,14 @@ class SettingsActivity : AppCompatActivity() {
 
         val builder = AlertDialog.Builder(this)
         builder.setView(dialogView)
-            .setTitle("Register")
-            .setPositiveButton("Register") { dialog, _ ->
+            .setTitle("Login")
+            .setPositiveButton("Login") { dialog, _ ->
                 // Handle registration logic here
                 val email = emailEditText.text.toString()
                 val password = passwordEditText.text.toString()
 
                 // Perform Login. Temp to show input values
-                println("Email: $email")
-                println("Password: $password")
+                login(dialogView, email, password)
 
                 dialog.dismiss()
             }
@@ -130,5 +143,75 @@ class SettingsActivity : AppCompatActivity() {
 
         val alertDialog = builder.create()
         alertDialog.show()
+    }
+
+    fun register(view: android.view.View, email: String, password: String, firstName: String, lastName: String) {
+        var url = "https://sportmap.akaver.com/api/v1.0/account/register"
+        var handler = HttpSingletonHandler.getInstance(this)
+
+        var httpRequest = object : StringRequest(
+            Request.Method.POST,
+            url,
+            Response.Listener { response -> Log.d("Response.Listener", response);
+                val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
+                Log.d("Response.Listener", response)
+                with (sharedPref.edit()) {
+                    putString("token", JSONObject(response).getString("token"))
+                    apply()
+                } },
+            Response.ErrorListener { error ->  Log.d("Response.ErrorListener", "${error.message} ${error.networkResponse.statusCode}")}
+        ){
+            override fun getBodyContentType(): String {
+                return "application/json"
+            }
+            override fun getBody(): ByteArray {
+                val params = HashMap<String, String>()
+                params["email"] = email
+                params["password"] = password
+                params["firstName"] = firstName
+                params["lastName"] = lastName
+
+                var body = JSONObject(params as Map<*, *>).toString()
+                Log.d("getBody", body)
+
+                return body.toByteArray()
+            }
+        }
+        handler.addToRequestQueue(httpRequest)
+    }
+
+    fun login(view: android.view.View, email: String, password: String) {
+        val url = "https://sportmap.akaver.com/api/v1.0/account/login"
+        val handler = HttpSingletonHandler.getInstance(this)
+
+
+        //Save the token from the response json to shared preferences
+        val httpRequest = object : StringRequest(
+            Request.Method.POST,
+            url,
+            Response.Listener { response -> Log.d("Response.Listener", response);
+                val sharedPref = getSharedPreferences("Prefs", Context.MODE_PRIVATE) ?: return@Listener
+                with (sharedPref.edit()) {
+                    putString("token", JSONObject(response).getString("token"))
+                    apply()
+                    buttonLogin.text = "Logout"
+                } },
+            Response.ErrorListener { error ->  Log.d("Response.ErrorListener", "${error.message} ${error.networkResponse.statusCode}")}
+        ){
+            override fun getBodyContentType(): String {
+                return "application/json"
+            }
+            override fun getBody(): ByteArray {
+                val params = HashMap<String, String>()
+                params["email"] = email
+                params["password"] = password
+
+                val body = JSONObject(params as Map<*, *>).toString()
+                Log.d("getBody", body)
+
+                return body.toByteArray()
+            }
+        }
+        handler.addToRequestQueue(httpRequest)
     }
 }
