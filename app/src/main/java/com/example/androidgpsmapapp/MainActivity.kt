@@ -925,16 +925,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         }
     }
 
-    private fun updateLocation(lat: Double, lon: Double, timestamp: Long){
-        println("Called: updateLocation")
-
-        val latLng = LatLng(lat, lon)
-        val newPositionWithTime = LatLngTime(LatLng(lat, lon), timestamp)
-        latLngTime.add(newPositionWithTime)
-
-        polyLineOptions.add(latLng).color(Color.TRANSPARENT)
-        polyline = mMap.addPolyline(polyLineOptions)
-
+    private fun renderNewLine() {
         drawPathWithSpeedColors(mMap, latLngTime)
 
         if (keepCentered) {
@@ -945,6 +936,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         updateOverallDistance()
         updateDistanceToLastCheckpoint()
         updateWaypointDistance()
+    }
+    private fun updateLocation(lat: Double, lon: Double, timestamp: Long){
+        println("Called: updateLocation")
+
+        val latLng = LatLng(lat, lon)
+        val newPositionWithTime = LatLngTime(LatLng(lat, lon), timestamp)
+        latLngTime.add(newPositionWithTime)
+
+        polyLineOptions.add(latLng).color(Color.TRANSPARENT)
+        polyline = mMap.addPolyline(polyLineOptions)
     }
 
     private fun drawPathWithSpeedColors(googleMap: GoogleMap, points: List<LatLngTime>) {
@@ -1030,6 +1031,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
                             textViewMainLon.text = location.longitude.toString()
                             updateLocation(location.latitude, location.longitude, location.time)
                         }
+                        renderNewLine()
                     }
                     drawPath()
 
