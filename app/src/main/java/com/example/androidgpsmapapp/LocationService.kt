@@ -166,6 +166,8 @@ class LocationService : Service() {
         getLastKnownLocation()
 
         requestLocationUpdates()
+
+        sendLocationUpdateBroadcast()
     }
 
     private fun requestLocationUpdates() {
@@ -212,7 +214,6 @@ class LocationService : Service() {
                 showNotification()
                 //sendLocationUpdateBroadcast(location)
                 locations.add(location)
-                sendLocationUpdateBroadcast()
                 updateSession(location, "00000000-0000-0000-0000-000000000001")
             }
         } else {
@@ -220,7 +221,6 @@ class LocationService : Service() {
             showNotification()
             //sendLocationUpdateBroadcast(location)
             locations.add(location)
-            sendLocationUpdateBroadcast()
         }
     }
 
@@ -236,12 +236,7 @@ class LocationService : Service() {
                 LocalBroadcastManager.getInstance(this@LocationService).sendBroadcast(broadcastIntent)
 
                 // Check for the condition to stop sending broadcasts
-                if (locations.size == 0) {
-                    Log.d("Locations", "No locations")
-                    handler.removeCallbacks(this)
-                } else {
-                    handler.postDelayed(this, delayMillis.toLong())
-                }
+                handler.postDelayed(this, delayMillis.toLong())
             }
         }, delayMillis.toLong())
     }
