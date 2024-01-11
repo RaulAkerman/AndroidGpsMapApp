@@ -575,7 +575,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         var straightDistance = 0f
 
         if (points != null) {
-            straightDistance = userLocation?.let { calculateDistance(points[0], it) }!!
+            if (userLocation != null) {
+                straightDistance = userLocation?.let { calculateDistance(points[0], it) }!!
+            }
             for (i in 1 until points.size) {
                 val prevLatLng = points[i - 1]
                 val currentLatLng = points[i]
@@ -1206,6 +1208,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     }
 
     private fun loadFromDB(){
+        resetVariablesToDefault()
         val gson = Gson()
         val prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
         val typeLatLngTime = object : TypeToken<MutableList<LatLngTime>>() {}.type

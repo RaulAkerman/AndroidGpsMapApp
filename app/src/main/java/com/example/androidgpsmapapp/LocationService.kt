@@ -62,7 +62,7 @@ class LocationService : Service() {
             if (locationQueue.isNotEmpty()) {
                 sendLocationUpdateBroadcast(locationQueue.elementAt(0))
             }
-            handler.postDelayed(this, 1000)
+            handler.postDelayed(this, 100)
         }
     }
 
@@ -337,8 +337,8 @@ class LocationService : Service() {
                 params["name"] = "sessionName"
                 params["description"] = "sessionDescription"
                 params["recordedAt"] = currentDate
-                params["paceMax"] = speedToSecondsPerKilometer(sharedPrefs.getInt("minSpeed", 0)).toInt()
-                params["paceMin"] = speedToSecondsPerKilometer(sharedPrefs.getInt("maxSpeed", 0)).toInt()
+                params["paceMax"] = speedToSecondsPerKilometer(sharedPrefs.getInt("minSpeed", 5)).toInt()
+                params["paceMin"] = speedToSecondsPerKilometer(sharedPrefs.getInt("maxSpeed", 10)).toInt()
 
                 val body = JSONObject(params as Map<*, *>).toString()
 
