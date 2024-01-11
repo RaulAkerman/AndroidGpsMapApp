@@ -78,6 +78,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private lateinit var buttonNorthUp: Button
     private lateinit var buttonSetRotation: Button
     private lateinit var buttonMainAddWP: Button
+    private lateinit var textViewOverallDistanceLine: TextView
 
     private val innerBroadcastReceiver = InnerBroadcastReceiver()
     private val innerBroadcastReceiverIntentFilter = IntentFilter()
@@ -191,8 +192,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         textViewWaypointDistance = findViewById(R.id.textViewDistanceToWP)
         textViewWaypointDistanceDirect = findViewById(R.id.textViewDistanceToWPLine)
         textViewWaypointSpeed = findViewById(R.id.textViewAverageSpeedWP)
-        textViewTimer.text = timerValue
+        textViewOverallDistanceLine = findViewById(R.id.textViewDistanceOverallLine)
 
+        textViewTimer.text = timerValue
+        textViewOverallDistanceLine.text = "0"
         textViewOverallDistance.text = "0"
         textViewOverallSpeed.text = "0"
         textViewCheckpointDistance.text = "0"
@@ -569,8 +572,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private fun updateOverallDistance() {
         val points = polyline?.points
         var totalLength = 0.0
+        var straightDistance = 0f
 
         if (points != null) {
+            straightDistance = userLocation?.let { calculateDistance(points[0], it) }!!
             for (i in 1 until points.size) {
                 val prevLatLng = points[i - 1]
                 val currentLatLng = points[i]
@@ -579,6 +584,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         }
 
         val roundedDistance = String.format("%.0f", totalLength)
+        val roundedStraightDistance = String.format("%.0f", straightDistance)
+        textViewOverallDistanceLine.text = roundedStraightDistance
         textViewOverallDistance.text = roundedDistance
         textViewOverallSpeed.text = calculateTimeToTravelOneKm(totalLength, timerValueInSecond).toString()
     }
@@ -695,6 +702,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         outState.putString("waypointDistanceDirect", textViewWaypointDistanceDirect.text.toString())
         outState.putString("waypointDistance", textViewWaypointDistance.text.toString())
         outState.putString("waypointSpeed", textViewWaypointSpeed.text.toString())
+        outState.putString("overallDistanceLine", textViewOverallDistanceLine.text.toString())
 
         //Save buttonMainStartStopService text
         outState.putString("buttonMainStartStopServiceText", buttonMainStartStopService.text.toString())
@@ -756,14 +764,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             savedInstanceState.getDouble("userLocationLon")
         )
 
-        textViewOverallDistance.text = savedInstanceState.getString("overallDistance", "")
-        textViewOverallSpeed.text = savedInstanceState.getString("overallSpeed", "")
-        textViewCheckpointDistance.text = savedInstanceState.getString("checkpointDistance", "")
-        textViewCheckpointDistanceDirect.text = savedInstanceState.getString("checkpointDistanceDirect", "")
-        textViewCheckpointSpeed.text = savedInstanceState.getString("checkpointSpeed", "")
-        textViewWaypointDistanceDirect.text = savedInstanceState.getString("waypointDistanceDirect", "")
-        textViewWaypointDistance.text = savedInstanceState.getString("waypointDistance", "")
-        textViewWaypointSpeed.text = savedInstanceState.getString("waypointSpeed", "")
+        textViewOverallDistance.text = savedInstanceState.getString("overallDistance", "0")
+        textViewOverallSpeed.text = savedInstanceState.getString("overallSpeed", "0")
+        textViewCheckpointDistance.text = savedInstanceState.getString("checkpointDistance", "0")
+        textViewCheckpointDistanceDirect.text = savedInstanceState.getString("checkpointDistanceDirect", "0")
+        textViewCheckpointSpeed.text = savedInstanceState.getString("checkpointSpeed", "0")
+        textViewWaypointDistanceDirect.text = savedInstanceState.getString("waypointDistanceDirect", "0")
+        textViewWaypointDistance.text = savedInstanceState.getString("waypointDistance", "0")
+        textViewWaypointSpeed.text = savedInstanceState.getString("waypointSpeed", "0")
+        textViewOverallDistanceLine.text = savedInstanceState.getString("overallDistanceLine", "0")
 
         isCompassVisible = savedInstanceState.getBoolean("isCompassVisible")
 
@@ -1135,7 +1144,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         }
     }
 
-
     fun updateSessionCheckpoint() {
         val url = "https://sportmap.akaver.com/api/v1.0/GpsLocations"
         val handler = HttpSingletonHandler.getInstance(this)
@@ -1162,7 +1170,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
             override fun getBodyContentType(): String {
                 return "application/json"
             }
-
             override fun getBody(): ByteArray {
                 val params = HashMap<String, Any?>()
                 //Get shared preferences

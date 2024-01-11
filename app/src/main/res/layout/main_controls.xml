@@ -58,8 +58,9 @@
             android:layout_height="0dp"
             android:text="@string/overall"
             app:autoSizeTextType="uniform"
-            app:layout_constraintBottom_toTopOf="@+id/textViewSessionDurtation"
+            app:layout_constraintBottom_toTopOf="@+id/textViewDistanceOverallLine"
             app:layout_constraintEnd_toStartOf="@+id/guideline5"
+            app:layout_constraintHorizontal_bias="0.909"
             app:layout_constraintStart_toEndOf="@+id/buttonMainStartStopService"
             app:layout_constraintTop_toTopOf="parent" />
 
@@ -84,7 +85,7 @@
             app:layout_constraintBottom_toTopOf="@+id/textViewOverallSpeed"
             app:layout_constraintEnd_toStartOf="@+id/guideline5"
             app:layout_constraintStart_toEndOf="@+id/buttonMainStartStopService"
-            app:layout_constraintTop_toBottomOf="@+id/textViewOverallDistance" />
+            app:layout_constraintTop_toBottomOf="@+id/textViewDistanceOverallLine" />
 
         <TextView
             android:id="@+id/textViewDistanceFromCP"
@@ -166,6 +167,17 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@+id/buttonMainAddWP"
             app:layout_constraintTop_toBottomOf="@+id/textViewDistanceToWPLine" />
+
+        <TextView
+            android:id="@+id/textViewDistanceOverallLine"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:text="Overall line"
+            app:autoSizeTextType="uniform"
+            app:layout_constraintBottom_toTopOf="@+id/textViewSessionDurtation"
+            app:layout_constraintEnd_toStartOf="@+id/guideline5"
+            app:layout_constraintStart_toStartOf="@+id/textViewOverallSpeed"
+            app:layout_constraintTop_toBottomOf="@+id/textViewOverallDistance" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>
