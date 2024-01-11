@@ -1018,24 +1018,36 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         override fun onReceive(context: Context?, broadcastIntent: Intent?) {
             when (broadcastIntent!!.action){
                 C.ACTION_LOCATION_UPDATE -> {
-                    userLocation = LatLng(
-                        broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0),
-                        broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0)
-                    )
-                    userHeading = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_BEARING, 0.0f)
-                    userSpeed = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_SPEED, 0.0f)
-                    userAccuracy = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_ACCURACY, 0.0f)
-                    userAltitude = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_ALTITUDE, 0.0)
-                    userVerticalAccuracy = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_VERTICAL_ACCURACY, 0.0f)
-                    textViewMainLat.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0).toString()
-                    textViewMainLon.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0).toString()
-                    updateLocation(broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0), broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0), broadcastIntent.getLongExtra(C.DATA_LOCATION_UPDATE_TIMESTAMP, 0L))
+                    val locations = broadcastIntent.getParcelableArrayListExtra<Location>(C.DATA_LOCATION_UPDATE)
+                    if (locations != null) {
+                        for (location in locations) {
+                            userLocation = LatLng(location.latitude, location.longitude)
+                            userHeading = location.bearing
+                            userAccuracy = location.accuracy
+                            userAltitude = location.altitude
+                            userVerticalAccuracy = location.verticalAccuracyMeters
+                            textViewMainLat.text = location.latitude.toString()
+                            textViewMainLon.text = location.longitude.toString()
+                            updateLocation(location.latitude, location.longitude, location.time)
+                        }
+                    }
+//                    userLocation = LatLng(
+//                        broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0),
+//                        broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0)
+//                    )
+
+//                    userHeading = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_BEARING, 0.0f)
+//                    userAccuracy = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_ACCURACY, 0.0f)
+//                    userAltitude = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_ALTITUDE, 0.0)
+//                    userVerticalAccuracy = broadcastIntent.getFloatExtra(C.DATA_LOCATION_UPDATE_VERTICAL_ACCURACY, 0.0f)
+//                    textViewMainLat.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0).toString()
+//                    textViewMainLon.text = broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0).toString()
+//                    updateLocation(broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0), broadcastIntent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0), broadcastIntent.getLongExtra(C.DATA_LOCATION_UPDATE_TIMESTAMP, 0L))
 
                     drawPath()
 
                     val returnIntent = Intent(C.ACTION_REMOVE_LOCATION_UPDATE)
-                    returnIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, userLocation?.latitude)
-                    returnIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, userLocation?.longitude)
+                    returnIntent.putParcelableArrayListExtra(C.LOCATION_DATA, locations)
                     LocalBroadcastManager.getInstance(this@MainActivity).sendBroadcast(returnIntent)
                 }
                 C.ACTION_PLACE_CHECKPOINT -> {

@@ -37,7 +37,7 @@ class LocationService : Service() {
         const val ACTION_ADD_CHECKPOINT_BROADCAST = "com.example.androidgpsmapapp.ADD_CHECKPOINT_BROADCAST"
     }
 
-    private val locationQueue = mutableListOf<Location>()
+    private val locations = ArrayList<Location>()
 
     private val innerBroadcastReceiver = InnerBroadcastReceiver()
     private val innerBroadcastReceiverIntentFilter = IntentFilter()
@@ -57,19 +57,9 @@ class LocationService : Service() {
 
     private val handler = Handler()
 
-    private val locationQueueProcessor: Runnable = object : Runnable {
-        override fun run() {
-            if (locationQueue.isNotEmpty()) {
-                sendLocationUpdateBroadcast(locationQueue.elementAt(0))
-            }
-            handler.postDelayed(this, 100)
-        }
-    }
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // call within 5 seconds from start
         showNotification()
-        locationQueue.clear()
         innerBroadcastReceiverIntentFilter.addAction(C.ACTION_STOP_CHECKPOINT_BROADCAST)
         innerBroadcastReceiverIntentFilter.addAction(C.ACTION_REMOVE_LOCATION_UPDATE)
         LocalBroadcastManager.getInstance(this).registerReceiver(innerBroadcastReceiver, innerBroadcastReceiverIntentFilter)
@@ -176,8 +166,6 @@ class LocationService : Service() {
         getLastKnownLocation()
 
         requestLocationUpdates()
-
-        handler.postDelayed(locationQueueProcessor, 1000)
     }
 
     private fun requestLocationUpdates() {
@@ -223,29 +211,39 @@ class LocationService : Service() {
                 prevLocation = location
                 showNotification()
                 //sendLocationUpdateBroadcast(location)
-                locationQueue.add(location)
+                locations.add(location)
+                sendLocationUpdateBroadcast()
                 updateSession(location, "00000000-0000-0000-0000-000000000001")
             }
         } else {
             prevLocation = location
             showNotification()
             //sendLocationUpdateBroadcast(location)
-            locationQueue.add(location)
+            locations.add(location)
+            sendLocationUpdateBroadcast()
         }
     }
 
-    private fun sendLocationUpdateBroadcast(location: Location) {
-        val broadcastIntent = Intent(C.ACTION_LOCATION_UPDATE)
-        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LAT, location.latitude)
-        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_LON, location.longitude)
-        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_BEARING, location.bearing)
-        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_SPEED, location.speed)
-        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_ACCURACY, location.accuracy)
-        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_ALTITUDE, location.altitude)
-        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_VERTICAL_ACCURACY, location.verticalAccuracyMeters)
-        broadcastIntent.putExtra(C.DATA_LOCATION_UPDATE_TIMESTAMP, location.time)
+    private fun sendLocationUpdateBroadcast() {
+        val delayMillis = 2500 // Set your desired delay time in milliseconds
+        handler.postDelayed(object : Runnable {
+            override fun run() {
+                Log.d("Locations", locations.toString())
+                //Send broadcast for every location saved in the list
+                val broadcastIntent = Intent(C.ACTION_LOCATION_UPDATE)
+                //List of lists containing latitude, longitude, bearing, accuracy, altitude, verticalAccuracy, timestamp
+                broadcastIntent.putParcelableArrayListExtra(C.DATA_LOCATION_UPDATE, ArrayList(locations))
+                LocalBroadcastManager.getInstance(this@LocationService).sendBroadcast(broadcastIntent)
 
-        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+                // Check for the condition to stop sending broadcasts
+                if (locations.size == 0) {
+                    Log.d("Locations", "No locations")
+                    handler.removeCallbacks(this)
+                } else {
+                    handler.postDelayed(this, delayMillis.toLong())
+                }
+            }
+        }, delayMillis.toLong())
     }
 
     private inner class InnerBroadcastReceiver : BroadcastReceiver() {
@@ -262,13 +260,9 @@ class LocationService : Service() {
                 }
             }
             if (intent?.action == C.ACTION_REMOVE_LOCATION_UPDATE) {
-                val lat = intent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LAT, 0.0)
-                val lon = intent.getDoubleExtra(C.DATA_LOCATION_UPDATE_LON, 0.0)
-                for (location in locationQueue) {
-                    if (location.latitude == lat && location.longitude == lon) {
-                        locationQueue.remove(location)
-                        break
-                    }
+                val broadcastLocation = intent.getParcelableArrayListExtra<Location>(C.LOCATION_DATA)
+                for (location in broadcastLocation!!) {
+                    locations.remove(location)
                 }
             }
 
