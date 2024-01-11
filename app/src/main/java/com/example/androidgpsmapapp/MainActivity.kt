@@ -928,7 +928,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
     private fun renderNewLine() {
         drawPathWithSpeedColors(mMap, latLngTime)
 
-        if (keepCentered) {
+        if (keepCentered && userLocation != null) {
             mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation!!, 18f))
             updateMapOrientation()
         }
@@ -1005,6 +1005,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMapCli
         timerValue = "00:00:00"
         textViewTimer.text = timerValue
 
+        textViewOverallDistanceLine.text = "0"
+        textViewWaypointDistance.text = "0"
         textViewOverallDistance.text = "0"
         textViewOverallSpeed.text = "0"
         textViewCheckpointDistance.text = "0"
